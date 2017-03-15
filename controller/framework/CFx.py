@@ -1,25 +1,19 @@
 #!/usr/bin/env python
-import os
-import sys
-import json
-import signal
-import socket
+import os,sys,json,signal,socket,logging,time
 import controller.framework.fxlib as fxlib
 import controller.framework.ipoplib as ipoplib
-import argparse
-import binascii
-import threading
-import importlib
+import argparse,threading,importlib
 from getpass import getpass
 from collections import OrderedDict
 from controller.framework.CBT import CBT as _CBT
 from controller.framework.CFxHandle import CFxHandle
-import time
 
 
 class CFX(object):
 
     def __init__(self):
+        logging.basicConfig(format='[%(asctime)s.%(msecs)03d] %(levelname)s:%(message)s', datefmt='%Y%m%d %H:%M:%S',
+                            level=logging.INFO)
         self.CONFIG = {}
         self.parse_config()
 
@@ -47,13 +41,11 @@ class CFX(object):
             self.sock = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
             self.sock_svr = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
             self.sock_svr.bind(("::1", self.CONFIG['CFx']["contr_port"]))
-            print ('using ipv6')
         else:
             self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             self.sock_svr = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             self.sock_svr.bind((self.CONFIG['TincanSender']["localhost"],
                                 self.CONFIG['CFx']["contr_port"]))
-            print ('using ipv4')
         self.sock.bind(("", 0))
         self.sock_list = [self.sock, self.sock_svr]
         
@@ -74,7 +66,8 @@ class CFX(object):
     def initialize(self,):
         # issue tincan API calls for controller initialization
 
-        print("Creating tincan end point")
+
+        logging.info("Creating Tincan inter-process link")
         ep = ipoplib.ENDPT
         if socket.has_ipv6 == False:
             ep["IPOP"]["Request"]["AddressFamily"] = "af_inet"
@@ -85,7 +78,7 @@ class CFX(object):
         fxlib.send_msg(self.sock, json.dumps(ep))
         time.sleep(1)
 
-        print("Setting Tincan logging level")
+        logging.info("Setting Tincan log level to "+self.CONFIG["Tincan"]["LogLevel"])
         self.transaction_counter += 1
         lgl = ipoplib.LOGLVEL
         lgl["IPOP"]["Request"]["LogLevel"] = self.CONFIG["Tincan"]["LogLevel"]
@@ -97,7 +90,7 @@ class CFX(object):
         for i in range(len(self.vnetdetails)):
             vn = ipoplib.VNET
             self.transaction_counter += 1
-            print("Create VNET")
+            logging.info("Creating Vnet {0}".format(self.vnetdetails[i]["TapName"]))
             vn["IPOP"]["TransactionId"] = self.transaction_counter
             vn["IPOP"]["Request"]["LocalUID"]       = self.vnetdetails[i]["uid"]
             vn["IPOP"]["Request"]["LocalVirtIP6"]   = self.vnetdetails[i]["ip6"]
@@ -145,7 +138,7 @@ class CFX(object):
 
             fxlib.send_msg(self.sock,json.dumps(vn))
 
-            print("net ignore list")
+            logging.info("Ignoring interfaces {0}".format(self.vnetdetails[i]["IgnoredNetInterfaces"]))
             if "IgnoredNetInterfaces" in self.vnetdetails[i]:
                 net_ignore_list = ipoplib.IGNORE
                 self.transaction_counter += 1
@@ -156,7 +149,6 @@ class CFX(object):
                 fxlib.send_msg(self.sock, json.dumps(net_ignore_list))
             time.sleep(1)
 
-            print("GET NODE STATE")
             get_state_request = ipoplib.LSTATE
             self.transaction_counter += 1
             get_state_request["IPOP"]["TransactionId"]              = self.transaction_counter
@@ -165,8 +157,7 @@ class CFX(object):
 
             fxlib.send_msg(self.sock,json.dumps(get_state_request))
 
-
-        print("CFx initialized. Loading Controller Modules")
+        logging.info("CFx initialized, proceeding to load modules")
         self.loaded_modules = ['CFx']  # list of modules already loaded
 
         # check for circular dependencies in the configuration file
@@ -179,7 +170,7 @@ class CFX(object):
                     pass
 
         if self.detect_cyclic_dependency(dependency_graph):
-            print("Circular dependency detected in config.json. Exiting")
+            logging.error("Circular dependency detected in config.json. Exiting")
             sys.exit()
 
         # iterate and load the modules specified in the configuration file
@@ -272,7 +263,7 @@ class CFX(object):
         return any(visit(v) for v in g)
 
     def __handler(self, signum=None, frame=None):
-        print('Signal handler called with signal ', signum)
+        logging.info('Signal handler called with signal ', signum)
 
     def parse_config(self):
         self.CONFIG = fxlib.CONFIG
@@ -325,7 +316,7 @@ class CFX(object):
             import keyring
             keyring_installed = True
         except:
-            print("keyring module is not installed")
+            logging.info("Key-ring module is not installed")
 
         if "Password" not in self.CONFIG["XmppClient"]:
             xmpp_pswd = None
@@ -346,7 +337,7 @@ class CFX(object):
                         keyring.set_password("ipop", self.CONFIG["XmppClient"]["Username"],
                                              self.CONFIG["XmppClient"]["Password"])
                     except:
-                        print("unable to store password in keyring")
+                        logging.info("unable to store password in keyring")
             else:
                 raise RuntimeError("no XMPP password found")
 
@@ -393,7 +384,7 @@ class CFX(object):
             self.submitCBT(terminateCBT)
 
         # wait for the threads to process their current CBTs and exit
-        print("waiting for timer threads to exit gracefully...")
+            logging.info("waiting for timer threads to exit gracefully...")
         for handle in self.CFxHandleDict:
             if self.CFxHandleDict[handle].joinEnabled:
                 self.CFxHandleDict[handle].CMThread.join()

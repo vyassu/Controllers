@@ -13,6 +13,7 @@ def checkTincanState():
 def main():
     stime = time.time()
     # Loop till Tincan not in running state
+
     while checkTincanState() == False:
         if time.time()-stime > 10:
             print("IPOP Tincan not started.!!")
