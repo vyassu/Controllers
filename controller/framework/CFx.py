@@ -263,7 +263,7 @@ class CFX(object):
         return any(visit(v) for v in g)
 
     def __handler(self, signum=None, frame=None):
-        logging.info('Signal handler called with signal ', signum)
+        print('Signal handler called with signal ', signum)
 
     def parse_config(self):
         self.CONFIG = fxlib.CONFIG
