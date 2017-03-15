@@ -167,7 +167,6 @@ class TincanDispatcher(ControllerModule):
                     self.registerCBT("BaseTopologyManager", "TINCAN_PACKET", datagram)
                     #self.registerCBT('Multicast', 'IP_PACKET', datagram)
                 elif str(msg[24:28]) == "0806":
-                    print("ARP/RevereseARP Packet obtained from Tincan")
                     datagram["message_type"] = "multicast"
                     datagram["m_type"] = "ARP"
                     self.registerCBT('Multicast', 'ARP_PACKET', datagram)

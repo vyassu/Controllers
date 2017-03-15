@@ -603,7 +603,7 @@ class BaseTopologyManager(ControllerModule,CFX):
 
                 if uid not in interface_details["online_peer_uid"] and uid !=localuid:
                     nextuid = self.getnearestnode(uid,interface_name)
-                    nextnodemac = interface_details["uid_mac_table"][nextuid][0]
+                    nextnodemac = interface_details["peers"][nextuid]["mac"]
 
                     '''
                     for destmac in list(msg["mac_ip_table"].keys()):
