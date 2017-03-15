@@ -12,8 +12,6 @@ from controller.framework.CFxHandle import CFxHandle
 class CFX(object):
 
     def __init__(self):
-        logging.basicConfig(format='[%(asctime)s.%(msecs)03d] %(levelname)s:%(message)s', datefmt='%Y%m%d %H:%M:%S',
-                            level=logging.INFO)
         self.CONFIG = {}
         self.parse_config()
 
@@ -65,9 +63,7 @@ class CFX(object):
 
     def initialize(self,):
         # issue tincan API calls for controller initialization
-
-
-        logging.info("Creating Tincan inter-process link")
+        print("Creating Tincan inter-process link")
         ep = ipoplib.ENDPT
         if socket.has_ipv6 == False:
             ep["IPOP"]["Request"]["AddressFamily"] = "af_inet"
@@ -78,7 +74,7 @@ class CFX(object):
         fxlib.send_msg(self.sock, json.dumps(ep))
         time.sleep(1)
 
-        logging.info("Setting Tincan log level to "+self.CONFIG["Tincan"]["LogLevel"])
+        print("Setting Tincan log level to "+self.CONFIG["Tincan"]["LogLevel"])
         self.transaction_counter += 1
         lgl = ipoplib.LOGLVEL
         lgl["IPOP"]["Request"]["LogLevel"] = self.CONFIG["Tincan"]["LogLevel"]
@@ -90,7 +86,7 @@ class CFX(object):
         for i in range(len(self.vnetdetails)):
             vn = ipoplib.VNET
             self.transaction_counter += 1
-            logging.info("Creating Vnet {0}".format(self.vnetdetails[i]["TapName"]))
+            print("Creating Vnet {0}".format(self.vnetdetails[i]["TapName"]))
             vn["IPOP"]["TransactionId"] = self.transaction_counter
             vn["IPOP"]["Request"]["LocalUID"]       = self.vnetdetails[i]["uid"]
             vn["IPOP"]["Request"]["LocalVirtIP6"]   = self.vnetdetails[i]["ip6"]
@@ -138,7 +134,7 @@ class CFX(object):
 
             fxlib.send_msg(self.sock,json.dumps(vn))
 
-            logging.info("Ignoring interfaces {0}".format(self.vnetdetails[i]["IgnoredNetInterfaces"]))
+            print("Ignoring interfaces {0}".format(self.vnetdetails[i]["IgnoredNetInterfaces"]))
             if "IgnoredNetInterfaces" in self.vnetdetails[i]:
                 net_ignore_list = ipoplib.IGNORE
                 self.transaction_counter += 1
@@ -157,7 +153,7 @@ class CFX(object):
 
             fxlib.send_msg(self.sock,json.dumps(get_state_request))
 
-        logging.info("CFx initialized, proceeding to load modules")
+        print("CFx initialized, proceeding to load modules")
         self.loaded_modules = ['CFx']  # list of modules already loaded
 
         # check for circular dependencies in the configuration file
@@ -170,7 +166,7 @@ class CFX(object):
                     pass
 
         if self.detect_cyclic_dependency(dependency_graph):
-            logging.error("Circular dependency detected in config.json. Exiting")
+            print("Circular dependency detected in config.json. Exiting")
             sys.exit()
 
         # iterate and load the modules specified in the configuration file
@@ -316,7 +312,7 @@ class CFX(object):
             import keyring
             keyring_installed = True
         except:
-            logging.info("Key-ring module is not installed")
+            print("Key-ring module is not installed")
 
         if "Password" not in self.CONFIG["XmppClient"]:
             xmpp_pswd = None
@@ -337,7 +333,7 @@ class CFX(object):
                         keyring.set_password("ipop", self.CONFIG["XmppClient"]["Username"],
                                              self.CONFIG["XmppClient"]["Password"])
                     except:
-                        logging.info("unable to store password in keyring")
+                        print("unable to store password in keyring")
             else:
                 raise RuntimeError("no XMPP password found")
 
@@ -384,7 +380,7 @@ class CFX(object):
             self.submitCBT(terminateCBT)
 
         # wait for the threads to process their current CBTs and exit
-            logging.info("waiting for timer threads to exit gracefully...")
+            print("waiting for timer threads to exit gracefully...")
         for handle in self.CFxHandleDict:
             if self.CFxHandleDict[handle].joinEnabled:
                 self.CFxHandleDict[handle].CMThread.join()
