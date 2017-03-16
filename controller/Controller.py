@@ -5,8 +5,12 @@ import psutil,time
 # Function checks the system process table for Tincan process
 def checkTincanState():
     for process in psutil.process_iter():
-        if process.name().find("tincan")!=-1 or process.name() == "ipop-tincan":
-            return True
+        if type(process) is str:
+            if process.find("tincan")!=-1 or process == "ipop-tincan":
+                return True
+        else:
+            if process.name().find("tincan")!=-1 or process.name() == "ipop-tincan":
+                return True
     return False
 
 

@@ -140,15 +140,18 @@ class XmppClient(ControllerModule, sleekxmpp.ClientXMPP):
     def removepeerjid(self,message):
         peerjid = message["from"]
         self.log("Peer JID {0} offline".format(peerjid))
-        del self.xmpp_peers[peerjid]
-        uid  = self.jid_uid[peerjid][0]
-        del self.jid_uid[peerjid]
-        if uid in self.uid_jid.keys():
-            del self.uid_jid[uid]
-            self.update_peerlist = True
-            self.registerCBT("ConnectionManager", "remove_connection", \
-                             {"interface_name": self.interface_name, "uid": uid})
-            self.log("Removed Peer JID: {0} UID: {1} from the JID-UID and UID-JID Table".format(peerjid,uid))
+        if peerjid in self.xmpp_peers.keys():
+            del self.xmpp_peers[peerjid]
+
+        if peerjid in self.jid_uid.keys():
+            uid = self.jid_uid[peerjid][0]
+            del self.jid_uid[peerjid]
+            if uid in self.uid_jid.keys():
+                del self.uid_jid[uid]
+                self.update_peerlist = True
+                self.registerCBT("ConnectionManager", "remove_connection", \
+                                 {"interface_name": self.interface_name, "uid": uid})
+                self.log("Removed Peer JID: {0} UID: {1} from the JID-UID and UID-JID Table".format(peerjid,uid))
 
 
 
