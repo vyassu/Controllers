@@ -149,8 +149,6 @@ class XmppClient(ControllerModule, sleekxmpp.ClientXMPP):
             if uid in self.uid_jid.keys():
                 del self.uid_jid[uid]
                 self.update_peerlist = True
-                self.registerCBT("ConnectionManager", "remove_connection", \
-                                 {"interface_name": self.interface_name, "uid": uid})
                 self.log("Removed Peer JID: {0} UID: {1} from the JID-UID and UID-JID Table".format(peerjid,uid))
 
 
