@@ -156,6 +156,11 @@ class TincanSender(ControllerModule):
             log = "Routing Rule Removed: {0}".format(str(remove_routing["IPOP"]))
             self.registerCBT('Logger', 'debug', log)
             self.send_msg(json.dumps(remove_routing))
+        elif cbt.action == "DO_SEND_TINCAN_MSG":
+            data = cbt.data
+            data["IPOP"]["TransactionId"] = self.trans_counter
+            self.trans_counter += 1
+            self.send_msg(json.dumps(data))
         else:
             log = '{0}: unrecognized CBT {1} received from {2}'\
                     .format(cbt.recipient, cbt.action, cbt.initiator)

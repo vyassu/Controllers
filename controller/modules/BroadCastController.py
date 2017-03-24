@@ -1,6 +1,4 @@
 #!/usr/bin/env/ python
-import logging
-import controller.framework.ipoplib as ipoplib
 from controller.framework.ControllerModule import ControllerModule
 
 class BroadCastController(ControllerModule):

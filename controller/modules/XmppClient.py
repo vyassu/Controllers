@@ -17,7 +17,7 @@ if py_ver == 3:
     import _thread as thread
 else:
     import thread
-log_level = "info"
+log_level = "debug"
 
 
 # set up a new custom message stanza
@@ -94,7 +94,7 @@ class XmppClient(ControllerModule, sleekxmpp.ClientXMPP):
         # mappings within the /16 subnet
 
         if (self.vpn_type == "GroupVPN"):
-            ipop_interfaces = self.CFxHandle.queryParam("Tincan","Vnets")
+            ipop_interfaces = self.CFxHandle.queryParam("VirtualNetworkInitializer","Vnets")
             for interface_details in ipop_interfaces:
                 if interface_details["TapName"] == self.interface_name:
                     self.uid = interface_details["uid"]
@@ -148,28 +148,33 @@ class XmppClient(ControllerModule, sleekxmpp.ClientXMPP):
                                 self.registerCBT("BaseTopologyManager", "XMPP_MSG", msg)
 
         except Exception as err:
-            self.log("Exception in deletepeerjid method.{0}".format(err),severity="error")
+            self.log("Exception in deletepeerjid method. Error::{0}".format(err),severity="error")
 
     # Remove the Offline Peer from the internal dictionary
     def removepeerjid(self,message):
-        peerjid = message["from"]
-        self.log("Peer JID {0} offline".format(peerjid))
-        if peerjid in self.xmpp_peers.keys():
-            del self.xmpp_peers[peerjid]
+        try:
+            peerjid = message["from"]
+            self.log("Peer JID {0} offline".format(peerjid))
+            if peerjid in self.xmpp_peers.keys():
+                del self.xmpp_peers[peerjid]
 
-        if peerjid in self.jid_uid.keys():
-            uid = self.jid_uid[peerjid][0]
-            del self.jid_uid[peerjid]
-            if uid in self.uid_jid.keys():
-                del self.uid_jid[uid]
-                self.update_peerlist = True
-                self.log("Removed Peer JID: {0} UID: {1} from the JID-UID and UID-JID Table".format(peerjid,uid))
-                msg = {
-                    "uid" : uid,
-                    "type": "offline_peer",
-                    "interface_name":self.interface_name
-                }
-                self.registerCBT("BaseTopologyManager","XMPP_MSG",msg)
+            if peerjid in self.jid_uid.keys():
+                uid = self.jid_uid[peerjid][0]
+                del self.jid_uid[peerjid]
+                if uid in self.uid_jid.keys():
+                    del self.uid_jid[uid]
+                    self.update_peerlist = True
+                    self.registerCBT("ConnectionManager", "remove_connection", \
+                                     {"interface_name": self.interface_name, "uid": uid})
+                    self.log("Removed Peer JID: {0} UID: {1} from the JID-UID and UID-JID Table".format(peerjid,uid))
+                    msg = {
+                        "uid" : uid,
+                        "type": "offline_peer",
+                        "interface_name":self.interface_name
+                    }
+                    self.registerCBT("BaseTopologyManager","XMPP_MSG",msg)
+        except Exception as err:
+            self.log("Exception in remove peerjid method. Error::{0}".format(err),severity="error")
 
 
 

@@ -7,7 +7,7 @@ class ConnectionManager(ControllerModule):
         super(ConnectionManager, self).__init__(CFxHandle, paramDict, ModuleName)
         self.connection_details = {}
         self.CMConfig = paramDict
-        tincanparams = self.CFxHandle.queryParam("Tincan","Vnets")
+        tincanparams = self.CFxHandle.queryParam("VirtualNetworkInitializer","Vnets")
         self.CMConfig["num_successors"] = self.CFxHandle.queryParam("BaseTopologyManager","NumberOfSuccessors")
         self.CMConfig["num_chords"]     = self.CFxHandle.queryParam("BaseTopologyManager","NumberOfChords")
         self.CMConfig["ttl_on_demand"]  = self.CFxHandle.queryParam("BaseTopologyManager","OnDemandLinkTTL")
@@ -32,7 +32,7 @@ class ConnectionManager(ControllerModule):
 
     def request_connection(self, con_type, uid,interface_name,data,ttl):
         # send connection request to larger nodes
-        self.connection_details[interface_name][con_type][uid] = { "ttl":ttl ,"status": "con_req"}
+        self.connection_details[interface_name][con_type][uid] = { "ttl":ttl ,"status": "con_req","mac":""}
         try:
             self.send_msg_srv("con_req", uid, json.dumps(data),interface_name)
         except:
@@ -53,18 +53,26 @@ class ConnectionManager(ControllerModule):
     # remove connection
     # remove a link by peer UID
     # - uid = UID of the peer
-    def remove_connection(self, uid, interface_name):
-        for con_type in ["successor", "chord", "on_demand"]:
+    def remove_connection(self, uid, interface_name,connection_type=None):
+        if connection_type == None:
+            connection_type_list = ["successor", "chord", "on_demand"]
+        else:
+            connection_type_list = [connection_type]
+
+        for con_type in connection_type_list:
             if uid in self.connection_details[interface_name][con_type].keys():
-                mac = self.connection_details[interface_name][con_type][uid]["mac"]
-                msg = {"interface_name": interface_name, "uid": uid, "MAC": mac}
-                self.registerCBT('TincanSender', 'DO_TRIM_LINK', msg)
+                if self.connection_details[interface_name][con_type][uid]["status"] in ["online","offline"]:
+                    if "mac" in list(self.connection_details[interface_name][con_type][uid].keys()):
+                        mac = self.connection_details[interface_name][con_type][uid]["mac"]
+                        if mac!= None and mac !="":
+                            msg = {"interface_name": interface_name, "uid": uid, "MAC": mac}
+                            self.registerCBT('TincanInterface', 'DO_TRIM_LINK', msg)
                 self.connection_details[interface_name][con_type].pop(uid)
                 message = {"uid": uid, "interface_name": interface_name, "msg_type": "remove_peer"}
                 self.registerCBT("BaseTopologyManager", "UpdateConnectionDetails", message)
 
-        log = "removed connection: {0}".format(uid)
-        self.registerCBT('Logger', 'info', log)
+                log = "removed connection: {0}".format(uid)
+                self.registerCBT('Logger', 'info', log)
 
     def update_connection(self,data):
         uid = data["uid"]
@@ -89,7 +97,7 @@ class ConnectionManager(ControllerModule):
             #if self.linked(uid,interface_name):
                 # check whether the time to link has expired
                 if time.time() > links["successor"][uid]["ttl"]:
-                    self.remove_connection(uid, interface_name)
+                    self.remove_connection(uid, interface_name,connection_type="successor")
                     log = "Time to Live expired going to remove peer: {0}".format(uid)
                     self.registerCBT('Logger', 'info', log)
                     message = {"uid":uid,"interface_name":interface_name,"msg_type":"remove_peer"}
@@ -158,7 +166,7 @@ class ConnectionManager(ControllerModule):
                 if chord == uid:
                     return
                 else:
-                    self.remove_link("chord", chord, interface_name)
+                    self.remove_connection(chord, interface_name,connection_type="chord")
 
         # add chord link
         self.connection_details[interface_name]["chord"][uid] = {
@@ -220,18 +228,8 @@ class ConnectionManager(ControllerModule):
                 link_details["ttl"] = time.time() + self.CMConfig["ttl_on_demand"]
             # rate is below theshold and the time-to-live attribute expired: remove link
             elif time.time() > link_details["ttl"]:
-                self.remove_link("on_demand", uid,interface_name)
+                self.remove_connection(uid,interface_name,connection_type="on_demand")
 
-    def remove_link(self, con_type, uid, interface_name):
-        # remove peer from link type
-        links  = self.connection_details[interface_name]
-        if uid in links[con_type].keys():
-            links[con_type].pop(uid)
-
-        # this peer does not have any outbound links
-        if uid not in links["successor"].keys() + links["chord"].keys() + links["on_demand"].keys():
-            # remove connection
-            self.remove_connection(uid, interface_name)  #TODO
 
     def remove_successors(self,interface_name,current_uid):
         # sort nodes into rotary, unique list with respect to this UID
@@ -262,11 +260,11 @@ class ConnectionManager(ControllerModule):
             if self.linked(successors[i], interface_name):
                 num_linked_successors += 1
                 if num_linked_successors > (2 * int(self.CMConfig["num_successors"])):
-                    self.remove_link("successor", successors[i], interface_name)
+                    self.remove_connection(successors[i], interface_name,connection_type="successor")
             if self.linked(successors[-(i+1)], interface_name):
-                    num_linked_successors += 1
-                    if num_linked_successors > (2 * int(self.CMConfig["num_successors"])):
-                        self.remove_link("successor", successors[-(i+1)], interface_name)
+                num_linked_successors += 1
+                if num_linked_successors > (2 * int(self.CMConfig["num_successors"])):
+                    self.remove_connection(successors[-(i+1)], interface_name,connection_type="successor")
             i+=1
 
 
@@ -307,7 +305,7 @@ class ConnectionManager(ControllerModule):
             self.connection_details[interface_name][con_type][uid]["mac"] = peer_mac
             log = "recvd con_ack ({0}): {1}".format(con_type, uid)
             self.registerCBT('Logger', 'debug', log)
-            self.registerCBT('TincanSender', 'DO_CREATE_LINK', msg)
+            self.registerCBT('TincanInterface', 'DO_CREATE_LINK', msg)
             self.registerCBT("BaseTopologyManager", "UpdateConnectionDetails",
                              {"uid": uid, "interface_name": interface_name, "msg_type": "add_peer", "mac":peer_mac})
 

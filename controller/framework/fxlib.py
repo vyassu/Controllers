@@ -10,26 +10,24 @@ ipopVerRel = "{0}.{1}.{2}".format(ipopVerMjr, ipopVerMnr, ipopVerRev)
 # set default config values
 CONFIG = {
     "CFx": {
-        "subnet_mask": 16,
-        "contr_port": 5801,
         "local_uid": "",
         "uid_size": 40,
         "router_mode": False,
         "ipopVerRel" : ipopVerRel,
+    },
+    "VirtualNetworkInitializer":{
         "MTU4": 1200,
         "MTU6": 1200,
         "LocalPrefix6": 64,
         "LocalPrefix4": 16
     },
-    "TincanListener": {
+    "TincanInterface": {
         "buf_size": 65507,
         "socket_read_wait_time": 15,
-        "dependencies": ["Logger"]
-    },
-    "TincanSender": {
+        "ctrl_recv_port": 5801,
         "ip6_prefix": "fd50:0dbc:41f2:4a3c",
         "localhost": "127.0.0.1",
-        "svpn_port": 5800,
+        "ctrl_send_port": 5800,
         "localhost6": "::1",
         "dependencies": ["Logger"]
      }
@@ -37,7 +35,7 @@ CONFIG = {
 
 def gen_ip6(uid, ip6=None):
     if ip6 is None:
-        ip6 = CONFIG["TincanSender"]["ip6_prefix"]
+        ip6 = CONFIG["TincanInterface"]["ip6_prefix"]
     for i in range(0, 16, 4):
         ip6 += ":" + uid[i:i+4]
     return ip6
@@ -47,9 +45,9 @@ def gen_uid(ip4):
 
 def send_msg(sock, msg):
     if socket.has_ipv6:
-        dest = (CONFIG["TincanSender"]["localhost6"],
-                CONFIG["TincanSender"]["svpn_port"])
+        dest = (CONFIG["TincanInterface"]["localhost6"],
+                CONFIG["TincanInterface"]["svpn_port"])
     else:
-        dest = (CONFIG["TincanSender"]["localhost"],
-                CONFIG["TincanSender"]["svpn_port"])
+        dest = (CONFIG["TincanInterface"]["localhost"],
+                CONFIG["TincanInterface"]["svpn_port"])
     return sock.sendto(bytes((msg).encode('utf-8')),dest)

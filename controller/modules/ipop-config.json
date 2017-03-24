@@ -1,95 +1,107 @@
-{"CFx": {
+{
+  "CFx": {
     "Model": "GroupVPN"
   },
-  "Tincan": {
-    "LogLevel": "WARNING",
-    "Vnets": [{
-    "IP4": "172.31.0.1",
-    "IP4Prefix": 16,
-    "XMPPModuleName": "XmppClient",
-    "TapName": "ipop_tap0",
-    "Description": "Ethernet Device",
-    "IgnoredNetInterfaces": ["ipop_tap0", "ipop_tap1", "Bluetooth Network Connection", "VMware Network Adapter VMnet1", "VMware Network Adapter VMnet2"],
-    "L2TunnellingEnabled": 1
-
-  }],
-  "Stun": ["stun.l.google.com:19302"],
-  "Turn": [{
-    "Address": "*.*.*.*:19302",
-    "User": "***" ,
-    "Password": "***"
-  }]
-  },
   "Logger": {
-    "LogLevel": "WARNING",
+    "Enabled": true,
+    "LogLevel": "INFO",
     "LogOption": "Console",
     "BackupLogFileCount": 5,
-    "LogFileName": "ctr.log",
+    "LogFileName": "controller.log",
     "LogFileSize": 10000
+  },
+  "VirtualNetworkInitializer": {
+    "Enabled": true,
+    "LogLevel": "WARNING",
+    "Vnets": [
+      {
+        "IP4": "10.10.240.101",
+        "IP4Prefix": 20,
+        "Mtu4" :  1200,
+        "XMPPModuleName": "XmppClient",
+        "TapName": "ipop_tap0",
+        "Description": "Internal Beta 1 Test Network",
+        "IgnoredNetInterfaces": [ "ipop_tap0" ],
+        "L2TunnellingEnabled": 1
+
+      }
+    ],
+    "Stun": [ "stun.l.google.com:19302" ],
+    "Turn": [
+      {
+        "Address": "turn.ipop-project.org:19302",
+        "User": "",
+        "Password": ""
+      }
+    ],
+    "dependencies": [ "Logger", "TincanInterface" ]
   },
   "XmppClient": {
     "Enabled": true,
-    "Username": "",
+    "Username": "@xmpp.ipop-project.org",
     "Password": "",
-    "AddressHost": "",
+    "AddressHost": "xmpp.ipop-project.org",
     "Port": "5222",
     "TapName": "ipop_tap0",
     "AuthenticationMethod": "password",
     "AcceptUntrustedServer": true,
     "TimerInterval": 15,
-    "dependencies": ["Logger"]
+    "dependencies": [ "Logger" ]
   },
   "BaseTopologyManager": {
-    "NumberOfSuccessors": 2,
-    "NumberOfChords": 3,
-    "NumberOfOnDemand": 8,
+    "Enabled": true,
+    "NumberOfSuccessors": 100,
+    "NumberOfChords": 0,
+    "NumberOfOnDemand": 0,
     "NumberOfInbound": 20,
     "InitialLinkTTL": 120,
     "LinkPulse": 180,
     "OnDemandLinkTTL": 60,
     "TimerInterval": 1,
     "TopologyRefreshInterval": 15,
+    "OndemandThreshold":1000,
+    "OndemandConnectionWaitTime": 15,
     "NumberOfPingsToPeer": 5,
     "PeerPingInterval": 300,
     "MaxConnRetry": 5,
-    "dependencies": ["Logger"]
+    "dependencies": [ "Logger" ]
   },
-  "TincanDispatcher": {
-    "dependencies": ["Logger"]
-  },
-  "TincanListener" : {
+  "TincanInterface": {
+    "Enabled": true,
     "SocketReadWaitTime": 15,
-    "dependencies": ["Logger", "TincanDispatcher"]
-  },
-  "TincanSender": {
-    "dependencies": ["Logger"]
+    "dependencies": [ "Logger" ]
   },
   "OverlayVisualizer": {
-    "Enabled": false,
-    "WebServiceAddress": "*:8080/insertdata",
-    "TopologyDataQueryInterval": 2,
-    "WebServiceDataPostInterval": 2,
-    "TimerInterval": 1,
-    "NodeName": "*",
-    "dependencies": ["Logger"]
-  },
-  "BroadCastController": {
     "Enabled": true,
-    "dependencies": ["Logger"]
+    "WebServiceAddress": "ms1020.utah.cloudlab.us:8080/insertdata",
+    "TopologyDataQueryInterval": 5,
+    "WebServiceDataPostInterval": 5,
+    "TimerInterval": 5,
+    "NodeName": "101",
+    "dependencies": [ "Logger" ]
   },
   "BroadCastForwarder": {
     "Enabled": true,
-    "dependencies": ["Logger"]
+    "dependencies": [ "Logger" ]
   },
-  "Multicast": {
+  "NodeDiscovery": {
     "Enabled": true,
     "OnDemandThreshold": 15,
-    "dependencies": ["Logger"]
+    "dependencies": [ "Logger" ]
   },
   "ConnectionManager": {
+    "Enabled": true,
     "InitialLinkTTL": 120,
     "ChordLinkTTL": 180,
     "OndemandLinkRateThreshold": 128,
+    "dependencies": [ "Logger" ]
+  },
+  "IPMulticast": {
+    "Enabled": true,
+    "dependencies": ["Logger"]
+  },
+  "OverlayMulticast": {
+    "Enabled": true,
     "dependencies": ["Logger"]
   }
 }

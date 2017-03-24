@@ -23,7 +23,7 @@ class CFX(object):
         self.CFxHandleDict = {}
 
         self.vpn_type = self.CONFIG['CFx']['Model']
-
+        '''
         if self.vpn_type == 'GroupVPN':
             self.vnetdetails = self.CONFIG["Tincan"]["Vnets"]
             for k in range(len(self.vnetdetails)):
@@ -34,7 +34,8 @@ class CFX(object):
             self.ip4 = self.CONFIG['AddressMapper']["ip4"]
             self.uid = self.CONFIG['CFx']['local_uid']
             self.ip6 = fxlib.gen_ip6(self.uid)
-
+        '''
+        '''
         if socket.has_ipv6:
             self.sock = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
             self.sock_svr = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
@@ -46,6 +47,7 @@ class CFX(object):
                                 self.CONFIG['CFx']["contr_port"]))
         self.sock.bind(("", 0))
         self.sock_list = [self.sock, self.sock_svr]
+        '''
         
     def submitCBT(self, CBT):
         recipient = CBT.recipient
@@ -63,6 +65,7 @@ class CFX(object):
 
     def initialize(self,):
         # issue tincan API calls for controller initialization
+        '''
         print("Creating Tincan inter-process link")
         ep = ipoplib.ENDPT
         if socket.has_ipv6 == False:
@@ -154,6 +157,7 @@ class CFX(object):
             fxlib.send_msg(self.sock,json.dumps(get_state_request))
 
         print("CFx initialized, proceeding to load modules")
+        '''
         self.loaded_modules = ['CFx']  # list of modules already loaded
 
         # check for circular dependencies in the configuration file
@@ -210,6 +214,7 @@ class CFX(object):
             # instantiate the class with the CFxHandle reference and the
             # configuration parameter (additionally, pass the list of sockets to
             # the TincanListener and TincanSender modules
+            '''
             if module_name in ['TincanListener']:
                 instance = module_class([self.sock, self.sock_svr],
                                         handle,
@@ -221,7 +226,8 @@ class CFX(object):
                                         self.CONFIG[module_name],
                                         module_name)
             else:
-                instance = module_class(handle, self.CONFIG[module_name], module_name)
+            '''
+            instance = module_class(handle, self.CONFIG[module_name], module_name)
 
             handle.CMInstance = instance
             handle.CMConfig = self.CONFIG[module_name]
@@ -390,13 +396,17 @@ class CFX(object):
         sys.exit(0)
 
     def queryParam(self, ModuleName,ParamName=""):
-        if ModuleName in [None,""]:
-            return None
-        else:
-            if ParamName == "":
+        try:
+            if ModuleName in [None,""]:
                 return None
             else:
-                return self.CONFIG[ModuleName][ParamName]
+                if ParamName == "":
+                    return None
+                else:
+                    return self.CONFIG[ModuleName][ParamName]
+        except Exception as error:
+            print("Exception occurred while querying data."+str(error.message))
+            return None
 
 if __name__=="__main__":
     cf = CFX()
