@@ -66,6 +66,7 @@ class OverlayMulticast(ControllerModule):
                         if multicast_src_uid in self.overlay_multicast_details[interface_name]["publish"][topic]:
                             self.overlay_multicast_details[interface_name]["publish"][topic].remove(multicast_src_uid)
             else:
+                # Extracting Multicast Source UID from Subscription Table for Unicast of Subscribe message
                 if topic in self.overlay_multicast_details[interface_name]["subscription"].keys():
                     multicast_src_list = self.overlay_multicast_details[interface_name]["subscription"][topic]
                     for dst_uid in multicast_src_list:
@@ -76,10 +77,13 @@ class OverlayMulticast(ControllerModule):
                             "interface_name": interface_name,
                             "datagram": dataframe
                         }
-
                         self.registerCBT("BaseTopologyManager", "ICC_CONTROL", new_msg)
                 else:
                     self.registerCBT("BroadCastForwarder", "BroadcastPkt", cbt.data)
+                # Remove the entry from subscription table for unsubscribed sources
+                if operation == "03":
+                    if topic in self.overlay_multicast_details[interface_name]["subscription"].keys():
+                        del self.overlay_multicast_details[interface_name]["subscription"][topic]
             self.registerCBT("Logger", "debug", "Multicast Table:::" + str(self.overlay_multicast_details[interface_name]))
         else:
             self.registerCBT("Logger", "debug", "Overlay Data" + str(cbt.data))
