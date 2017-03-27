@@ -1,6 +1,6 @@
 from controller.framework.ControllerModule import ControllerModule
 from controller.framework.CFx import CFX
-import time,math,json,random,binascii
+import time,math,json,random
 from threading import Lock
 
 global btmlock
@@ -25,7 +25,7 @@ class BaseTopologyManager(ControllerModule,CFX):
         
         self.maxretries = self.CMConfig["MaxConnRetry"]
 
-        self.tincanparams = self.CFxHandle.queryParam("VirtualNetworkInitializer","Vnets")
+        self.tincanparams = self.CFxHandle.queryParam("Tincan","Vnets")
         for k in range(len(self.tincanparams)):
             interface_name= self.tincanparams[k]["TapName"]
             self.ipop_interface_details[interface_name]                         = {}
@@ -41,7 +41,6 @@ class BaseTopologyManager(ControllerModule,CFX):
             interface_details["ip_uid_table"]         = {}
             interface_details["uid_mac_table"]        = {}
             interface_details["mac_uid_table"]        = {}
-            interface_details["peer_uid_sendmsgcount"]= {}
             interface_details["xmpp_client_code"]     = self.tincanparams[k]["XMPPModuleName"]
         self.tincanparams = None
 
@@ -68,7 +67,7 @@ class BaseTopologyManager(ControllerModule,CFX):
                         "interface_name": interface_name
             }
             self.registerCBT("Logger","debug","ICC Message overlay" + str(cbtdata))
-            self.registerCBT('TincanInterface', 'DO_SEND_ICC_MSG', cbtdata)
+            self.registerCBT('TincanSender', 'DO_SEND_ICC_MSG', cbtdata)
         else:
             self.registerCBT("Logger", "warning", "Trying to send ICC message to Offline Peer {0}. Message:: {1}".format(uid,msg))
 
@@ -293,7 +292,7 @@ class BaseTopologyManager(ControllerModule,CFX):
                 self.add_outbound_link("successor", node, None, interface_name)
 
         # establishing link from the smallest UID node in the network to the biggest UID in the network
-        if min([uid] + nodes) == uid:
+        if min([uid] + nodes) == uid and len(nodes)>1:
             for node in list(reversed(nodes))[0:self.CMConfig["NumberOfSuccessors"]]:
                 #if node not in interface_details["online_peer_uid"]:
                 if self.linked(node, interface_name) == False:
@@ -472,7 +471,7 @@ class BaseTopologyManager(ControllerModule,CFX):
                 log = "recv con_req ({0}): {1}".format(msg["data"]["con_type"], uid)
                 self.registerCBT('Logger', 'debug', log)
                 if uid < interface_details["ipop_state"]["_uid"]:
-                    self.registerCBT('TincanInterface', 'DO_GET_CAS', msg)
+                    self.registerCBT('TincanSender', 'DO_GET_CAS', msg)
 
             # handle connection acknowledgement
             elif msg_type == "con_ack":
@@ -536,8 +535,7 @@ class BaseTopologyManager(ControllerModule,CFX):
                 interface_details["mac_uid_table"][msg["mac"]] = msg["_uid"]
                 if msg["_uid"] not in interface_details["uid_mac_table"].keys():
                     interface_details["uid_mac_table"][msg["_uid"]] = [msg["mac"]]
-                # Send MAC Address to ARPManager module
-                self.registerCBT("NodeDiscovery","getlocalmacaddress",{"interface_name":interface_name, "localmac": msg["mac"]})
+                self.registerCBT("Multicast","getlocalmacaddress",{"interface_name":interface_name, "localmac": msg["mac"]})
                 self.registerCBT("Logger","info","Local Node Info UID:{0} MAC:{1} IP4: {2}".format(msg["_uid"],\
                     msg["mac"],msg["_ip4"]))
             # update peer list
@@ -626,7 +624,7 @@ class BaseTopologyManager(ControllerModule,CFX):
                                 "sourcemac": nextnodemac,
                                 "destmac": [destmac]
                             }
-                            self.registerCBT("TincanInterface", "DO_INSERT_ROUTING_RULES", message)
+                            self.registerCBT("TincanSender", "DO_INSERT_ROUTING_RULES", message)
                         else:
                             olduid = interface_details["mac_uid_table"][destmac]
                             if olduid != uid:
@@ -635,7 +633,7 @@ class BaseTopologyManager(ControllerModule,CFX):
                                     "sourcemac": nextnodemac,
                                     "destmac": [destmac]
                                 }
-                                self.registerCBT("TincanInterface", "DO_INSERT_ROUTING_RULES", message)
+                                self.registerCBT("TincanSender", "DO_INSERT_ROUTING_RULES", message)
                     '''
 
                 for mac, ip in msg["mac_ip_table"].items():
@@ -687,11 +685,7 @@ class BaseTopologyManager(ControllerModule,CFX):
                     if "datagram" in msg.keys():
                         data = msg.pop("datagram")
                         msg["dataframe"] = data
-                        if data[0:12] == "FFFFFFFFFFFF" and data[68:76] == "49504F50" and \
-                            str(binascii.unhexlify(data[76:80]))!="04":
-                                msg["type"] ="remote"
-                                self.registerCBT("OverlayMulticast", "multicast", msg)
-                        self.registerCBT('TincanInterface', 'DO_INSERT_DATA_PACKET', msg)
+                        self.registerCBT('TincanSender', 'DO_INSERT_DATA_PACKET', msg)
 
             # handle find chord
             elif msg_type == "find_chord":
@@ -746,7 +740,8 @@ class BaseTopologyManager(ControllerModule,CFX):
                     "receivecount": "",
                 }
                 self.registerCBT("OverlayVisualizer","topology_details",new_msg)
-        # handle and forward tincan data packets
+
+            # handle and forward tincan data packets
         elif cbt.action == "TINCAN_PACKET":
             reqdata = cbt.data
             interface_name = reqdata["interface_name"]
@@ -780,25 +775,13 @@ class BaseTopologyManager(ControllerModule,CFX):
                 dst_uid = ip4_uid_table[dst_ip]
             elif destmac in interface_details["mac_uid_table"].keys():
                 dst_uid = interface_details["mac_uid_table"][destmac]
-            elif dst_ip.split(".")[0] >= "224" or destmac[0:6] == "01005E":
-                self.registerCBT("IPMulticast","datapacket",{"dataframe":data,"interface_name":interface_name,"type": "local"})
-                return
             elif destmac == "FFFFFFFFFFFF":
                 datapacket = {
-                    "dataframe": data,
-                    "interface_name": interface_name,
-
+                        "dataframe": data,
+                        "interface_name": interface_name,
+                        "type": "local"
                 }
-
-                if reqdata.get("type") == "remote":
-                    datapacket["type"] = "remote"
-                else:
-                    datapacket["type"] = "local"
-
-                if data[68:76] == "49504F50":
-                    self.registerCBT("OverlayMulticast", "multicast", datapacket)
-                else:
-                    self.registerCBT("BroadCastForwarder","BroadcastPkt",datapacket)
+                self.registerCBT("BroadCastForwarder","BroadcastPkt",datapacket)
                 return
             else:
                 log = "recv illegal tincan_packet: src={0} dst={1}".format(srcmac, destmac)
@@ -811,7 +794,7 @@ class BaseTopologyManager(ControllerModule,CFX):
                     "dataframe": data,
                     "interface_name": interface_name
                 }
-                self.registerCBT("TincanInterface","DO_INSERT_DATA_PACKET",network_inject_message)
+                self.registerCBT("TincanSender","DO_INSERT_DATA_PACKET",network_inject_message)
                 return
 
             # send forwarded message
@@ -822,28 +805,13 @@ class BaseTopologyManager(ControllerModule,CFX):
                 "datagram": data
             }
 
-            if dst_uid not in list(interface_details["peer_uid_sendmsgcount"].keys()):
-                interface_details["peer_uid_sendmsgcount"][dst_uid] ={"count":1}
-            else:
-                interface_details["peer_uid_sendmsgcount"][dst_uid]["count"] +=1
-
-                if interface_details["peer_uid_sendmsgcount"][dst_uid]["count"] > self.CMConfig["OndemandThreshold"]:
-                    if dst_uid in interface_details["online_peer_uid"]:
-                        interface_details["peer_uid_sendmsgcount"][dst_uid] = {"count": 0}
-                    elif "conn_init_time" not in list(interface_details["peer_uid_sendmsgcount"][dst_uid].keys()):
-                        interface_details["peer_uid_sendmsgcount"][dst_uid]["conn_init_time"] = time.time()
-                        # add on-demand link
-                        self.add_on_demand(dst_uid, interface_name)
-                    elif time.time() - interface_details["peer_uid_sendmsgcount"][dst_uid]["conn_init_time"] \
-                            > self.CMConfig["OndemandThreshold"] and dst_uid not in interface_details["online_peer_uid"]:
-                        interface_details["peer_uid_sendmsgcount"][dst_uid]["conn_init_time"] = time.time()
-                        # add on-demand link
-                        self.add_on_demand(dst_uid, interface_name)
-
             self.forward_msg("exact", dst_uid, new_msg, interface_name)
 
             log = "sent tincan_packet (exact): {0}. Message: {1}".format(dst_uid,data)
             self.registerCBT('Logger', 'info', log)
+
+            # add on-demand link
+            #self.add_on_demand(dst_uid, interface_name)
 
         else:
             log = '{0}: unrecognized CBT message {1} received from {2}.Data:: {3}' \
@@ -1004,7 +972,7 @@ class BaseTopologyManager(ControllerModule,CFX):
                     if self.ipop_interface_details[interface_name]["p2p_state"] == "searching":
                         msg = {"interface_name": interface_name, "MAC": ""}
                         #msg = {"interface_name": interface_name, "uid": ""}
-                        self.registerCBT('TincanInterface', 'DO_GET_STATE', msg)
+                        self.registerCBT('TincanSender', 'DO_GET_STATE', msg)
 
                     peer_list = list(self.ipop_interface_details[interface_name]["peers"].keys())
 
@@ -1015,9 +983,9 @@ class BaseTopologyManager(ControllerModule,CFX):
                                 "interface_name": interface_name,
                                 "MAC": self.ipop_interface_details[interface_name]["peers"][uid]["mac"],
                                 "uid": uid}
-                            self.registerCBT('TincanInterface', 'DO_GET_STATE', message)
+                            self.registerCBT('TincanSender', 'DO_GET_STATE', message)
 
-                    # self.registerCBT('TincanInterface', 'DO_ECHO', '')
+                    # self.registerCBT('TincanSender', 'DO_ECHO', '')
 
             # every <interval_ping> seconds
             if self.interval_counter % self.CMConfig["PeerPingInterval"] == 0:
