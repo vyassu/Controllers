@@ -286,7 +286,6 @@ class BaseTopologyManager(ControllerModule,CFX):
             while nodes[0] < uid:
                 nodes.append(nodes.pop(0))
         self.registerCBT('Logger', 'info', "Peer Nodes:" + str(interface_details["peers"]))
-	requested_nodes = []
         # link to the closest <num_successors> nodes (if not already linked)
         for node in nodes[0:min(len(nodes), self.CMConfig["NumberOfSuccessors"])]:
             #if node not in interface_details["online_peer_uid"]:
