@@ -49,8 +49,9 @@ class BaseTopologyManager(ControllerModule,CFX):
     def initialize(self):
         for interface_name in self.ipop_interface_details.keys():
             self.registerCBT(self.ipop_interface_details[interface_name]["xmpp_client_code"],"GetXMPPPeer","")
+	    self.ipop_interface_details[interface_name]["GeoIP"] = str(self.getGeoIP())
         self.registerCBT('Logger', 'info', "{0} Loaded".format(self.ModuleName))
-        self.ipop_interface_details[interface_name]["GeoIP"] = self.getGeoIP()
+        
 
     def send_msg_srv(self, msg_type, uid, msg, interface_name):
         cbtdata = {"method": msg_type, "overlay_id": 0, "uid": uid, "data": msg, "interface_name": interface_name}
