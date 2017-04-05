@@ -287,7 +287,7 @@ class BaseTopologyManager(ControllerModule,CFX):
         if max([uid] + nodes) != uid:
             while nodes[0] < uid:
                 nodes.append(nodes.pop(0))
-	requested_nodes = []
+        requested_nodes = []
         self.registerCBT('Logger', 'info', "Peer Nodes:" + str(interface_details["peers"]))
         # link to the closest <num_successors> nodes (if not already linked)
         for node in nodes[0:min(len(nodes), self.CMConfig["NumberOfSuccessors"])]:
