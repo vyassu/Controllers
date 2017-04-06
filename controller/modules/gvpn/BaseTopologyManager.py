@@ -49,7 +49,7 @@ class BaseTopologyManager(ControllerModule,CFX):
     def initialize(self):
         for interface_name in self.ipop_interface_details.keys():
             self.registerCBT(self.ipop_interface_details[interface_name]["xmpp_client_code"],"GetXMPPPeer","")
-	    self.ipop_interface_details[interface_name]["GeoIP"] = str(self.getGeoIP())
+            self.ipop_interface_details[interface_name]["GeoIP"] = str(self.getGeoIP())
         self.registerCBT('Logger', 'info', "{0} Loaded".format(self.ModuleName))
         
 
