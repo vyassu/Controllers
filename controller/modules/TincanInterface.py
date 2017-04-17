@@ -320,9 +320,6 @@ class TincanInterface(ControllerModule):
                                 # Check whether packet is IPMulticast Packet
                                 elif dataframe[0:6] == "01005E":
                                     self.registerCBT('IPMulticast', 'multicast', iccmsg["msg"])
-                                # Check whether packet is OverlayMulticast Packet
-                                elif dataframe[68:76] == "49504F50":
-                                    self.registerCBT("OverlayMulticast", "multicast", iccmsg["msg"])
                                 else:
                                     # Broadcast other packets
                                     self.registerCBT('BroadCastForwarder', 'BroadcastPkt', iccmsg["msg"])

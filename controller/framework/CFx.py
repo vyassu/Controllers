@@ -77,7 +77,8 @@ class CFX(object):
             # import the modules dynamically
             try:
                 module = importlib.import_module("controller.modules.{0}".format(module_name))
-            except ImportError:
+            except ImportError as error:
+                print("Exception caught in CFX module:{0}".format(error.message))
                 if self.vpn_type == "GroupVPN":
                     module = importlib.import_module("controller.modules.gvpn.{0}".format(module_name))
                 elif self.vpn_type == "SocialVPN":
@@ -90,23 +91,6 @@ class CFX(object):
 
             # create a CFxHandle object for each module
             handle = CFxHandle(self)
-
-            # instantiate the class with the CFxHandle reference and the
-            # configuration parameter (additionally, pass the list of sockets to
-            # the TincanListener and TincanSender modules
-            '''
-            if module_name in ['TincanListener']:
-                instance = module_class([self.sock, self.sock_svr],
-                                        handle,
-                                        self.CONFIG[module_name],
-                                        module_name)
-            elif module_name in ['TincanSender']:
-                instance = module_class([self.sock],
-                                        handle,
-                                        self.CONFIG[module_name],
-                                        module_name)
-            else:
-            '''
             instance = module_class(handle, self.CONFIG[module_name], module_name)
 
             handle.CMInstance = instance
