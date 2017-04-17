@@ -33,7 +33,6 @@ class OverlayVisualizer(ControllerModule):
         self.interval_counter +=1
         if self.interval_counter % self.CMConfig["TopologyDataQueryInterval"] == 0 :
             self.registerCBT("BaseTopologyManager", "get_visualizer_data","")
-            self.registerCBT("ConnectionManager", "get_visualizer_data", "")
 
         if self.interval_counter % self.CMConfig["WebServiceDataPostInterval"] == 0 :
             try:

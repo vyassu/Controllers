@@ -78,6 +78,7 @@ VNET = {
           "TurnUser" : "",
           "TurnPass" : "",
           "L2TunnelEnabled" : True,
+          "AutoTrimEnabled" : False,
           "IPMappingEnabled" : False
         }
     }
