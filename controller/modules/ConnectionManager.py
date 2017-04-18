@@ -117,12 +117,22 @@ class ConnectionManager(ControllerModule):
             ttl = self.connection_details[interface_name]["peers"][uid]["ttl"]
             if "online" == data["status"]:
                 ttl = time.time() + self.CMConfig["LinkPulse"]
+                if uid not in self.connection_details[interface_name]["online_peer_uid"]:
+                    self.connection_details[interface_name]["online_peer_uid"].append(uid)
+            elif "unknown" == data["status"]:
+                del self.connection_details[interface_name]["peers"][uid]
+                if uid in self.connection_details[interface_name]["online_peer_uid"]:
+                    self.connection_details[interface_name]["online_peer_uid"].remove(uid)
+                return
+            else:
+                if uid in self.connection_details[interface_name]["online_peer_uid"]:
+                    self.connection_details[interface_name]["online_peer_uid"].remove(uid)
             self.connection_details[interface_name]["peers"][uid]["ttl"] = ttl
             self.connection_details[interface_name]["peers"][uid]["stats"] = data["stats"]
             self.connection_details[interface_name]["peers"][uid]["status"] = data["status"]
             self.connection_details[interface_name]["peers"][uid]["con_status"] = data["status"]
             self.connection_details[interface_name]["peers"][uid]["mac"] = data["mac"]
-    # clean connections
+
 
     #  remove peers with expired time-to-live attributes
     def clean_connection(self, interface_name):
@@ -333,35 +343,6 @@ class ConnectionManager(ControllerModule):
                                  {"interface_name": interface_name, "localmac": msg["mac"]})
                 self.registerCBT("Logger", "info", "Local Node Info UID:\
                 {0} MAC:{1} IP4: {2}".format(msg["_uid"], msg["mac"],msg["_ip4"]))
-            # update peer list
-            elif msg_type == "peer_state":
-                uid = msg["uid"]
-                if uid in interface_details["peers"]:
-                    self.registerCBT("Logger", "info", "ConnectionManager"+str(self.connection_details))
-                    # preserve ttl and con_status attributes
-                    ttl = interface_details["peers"][uid]["ttl"]
-                    connretry = 0
-                    if "connretrycount" in interface_details["peers"][uid].keys():
-                        connretry = interface_details["peers"][uid]["connretrycount"]
-                    # update ttl attribute
-                    if "online" == msg["status"]:
-                        ttl = time.time() + self.CMConfig["LinkPulse"]
-                        if uid not in interface_details["online_peer_uid"]:
-                            interface_details["online_peer_uid"].append(uid)
-                    elif "unknown" == msg["status"]:
-                        del interface_details["peers"][uid]
-                        if uid in interface_details["online_peer_uid"]:
-                            interface_details["online_peer_uid"].remove(msg["uid"])
-                        return
-                    else:
-                        if msg["uid"] in interface_details["online_peer_uid"]:
-                            interface_details["online_peer_uid"].remove(uid)
-
-                    # update peer state
-                    interface_details["peers"][uid].update(msg)
-                    interface_details["peers"][uid]["ttl"] = ttl
-                    interface_details["peers"][uid]["con_status"] = msg["status"]
-                    interface_details["peers"][uid]["connretrycount"] = connretry
 
             elif msg_type == "GetOnlinePeerList":
                 interface_name = cbt.data["interface_name"]
@@ -385,5 +366,3 @@ class ConnectionManager(ControllerModule):
 
     def terminate(self):
         pass
-
-
