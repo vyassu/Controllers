@@ -53,10 +53,11 @@ class ConnectionManager(ControllerModule):
     def request_connection(self, con_type, uid, interface_name):
         conn_details = self.connection_details[interface_name]
         # add peer to link type
-
+        '''
         if uid < conn_details["ipop_state"]["_uid"]:
             self.registerCBT('Logger', 'info',"Dropping connection request to Node with SmallerUID. {0}".format(uid))
             return
+        '''
         self.registerCBT('Logger', 'debug', "Peer Table::" + str(conn_details["peers"]))
 
         # Connection Request Message
@@ -184,21 +185,22 @@ class ConnectionManager(ControllerModule):
                     # else if node has sent con_request concurrently
                 elif (peer[uid]["con_status"] == "sent_con_req"):
                     # peer with Bigger UID sends a response
-                    if (self.connection_details[interface_name]["ipop_state"]["_uid"] > uid):
-                        log_msg = "AIL: LargerUID respond_connection to {0}".format(uid)
-                        self.registerCBT('Logger', 'info', log_msg)
+                    #if (self.connection_details[interface_name]["ipop_state"]["_uid"] > uid):
+                    log_msg = "AIL: LargerUID respond_connection to {0}".format(uid)
+                    self.registerCBT('Logger', 'info', log_msg)
 
-                        peer[uid] = {
+                    peer[uid] = {
                             "uid": uid,
                             "ttl": ttl,
                             "con_status": "conc_sent_response",
                             "mac": data["peer_mac"]
-                        }
-                        # self.respond_connection(con_type, uid, fpr, interface_name)
-                        response_msg["ttl"] = ttl
-                        #self.registerCBT("ConnectionManager", "respond_connection", response_msg)
-                        self.send_msg_srv("con_ack", uid, json.dumps(response_msg), interface_name)
-                    # peer with larger UID ignores
+                    }
+                    # self.respond_connection(con_type, uid, fpr, interface_name)
+                    response_msg["ttl"] = ttl
+                    #self.registerCBT("ConnectionManager", "respond_connection", response_msg)
+                    self.send_msg_srv("con_ack", uid, json.dumps(response_msg), interface_name)
+                        # peer with larger UID ignores
+                    '''
                     else:
                         log_msg = "AIL: SmallerUID ignores from {0}".format(uid)
                         self.registerCBT('Logger', 'info', log_msg)
@@ -209,6 +211,7 @@ class ConnectionManager(ControllerModule):
                             "mac": data["peer_mac"]
                         }
                         return
+                    '''
                 elif peer[uid]["con_status"] == "offline":
                     if "connretrycount" not in peer[uid].keys():
                         peer[uid]["connretrycount"] = 0
@@ -248,19 +251,19 @@ class ConnectionManager(ControllerModule):
                 # responded to con_req
                 log_msg = "AIL: Recvd con_req for peer not in list {0}".format(uid)
                 self.registerCBT('Logger', 'info', log_msg)
-                if self.connection_details[interface_name]["ipop_state"]["_uid"] > uid:
-                    ttl = time.time() + self.CMConfig["InitialLinkTTL"]
-                    peer[uid] = {
+                #if self.connection_details[interface_name]["ipop_state"]["_uid"] > uid:
+                ttl = time.time() + self.CMConfig["InitialLinkTTL"]
+                peer[uid] = {
                         "uid": uid,
                         "ttl": ttl,
                         "con_status": "recv_con_req",
                         "mac": data["peer_mac"]
-                    }
+                }
                     # connection response
                     # self.respond_connection(con_type, uid, fpr, interface_name)
-                    response_msg["ttl"] = ttl
+                response_msg["ttl"] = ttl
                     #self.registerCBT("ConnectionManager", "respond_connection", response_msg)
-                    self.send_msg_srv("con_ack", uid, json.dumps(response_msg), interface_name)
+                self.send_msg_srv("con_ack", uid, json.dumps(response_msg), interface_name)
 
     def create_connection(self,uid,interface_name,msg):
         con_type = msg["data"]["con_type"]
