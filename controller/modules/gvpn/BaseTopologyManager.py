@@ -271,12 +271,13 @@ class BaseTopologyManager(ControllerModule,CFX):
                     self.ipop_interface_details[interface_name][con_type][uid] = {
                         "uid": uid,
                         "mac": mac,
-                        #"ttl": time.time()+self.CMConfig["InitialLinkTTL"]
+                        "ttl": time.time()+self.CMConfig["InitialLinkTTL"]
                     }
 
                     self.ipop_interface_details[interface_name]["uid_mac_table"][uid] = [mac]
                     self.ipop_interface_details[interface_name]["mac_uid_table"][mac] = uid
                     self.registerCBT('Logger', 'debug', "inside add peer **********")
+                    self.registerCBT('Logger', 'info', "Peer UID {0} Added".format(uid))
                 elif msg_type == "remove_peer":
                     self.registerCBT('Logger', 'debug', "inside remove peer************")
                     if uid in list(self.ipop_interface_details[interface_name]["successor"].keys()):
@@ -290,7 +291,7 @@ class BaseTopologyManager(ControllerModule,CFX):
                         for mac in maclist:
                             del self.ipop_interface_details[interface_name]["mac_uid_table"][mac]
                         del self.ipop_interface_details[interface_name]["uid_mac_table"][uid]
-
+                    self.registerCBT('Logger', 'info', "Peer UID {0} removed from BTM".format(uid))
                 else:
                     log = '{0}: unrecognized CBT message {1} received from {2}.Data:: {3}' \
                         .format(cbt.recipient, cbt.action, cbt.initiator, cbt.data)
@@ -301,31 +302,6 @@ class BaseTopologyManager(ControllerModule,CFX):
                 msg_type = msg.get("type", None)
                 interface_name = msg["interface_name"]
                 interface_details = self.ipop_interface_details[interface_name]
-                '''
-                if msg_type == "ping":
-                    # add source node to the list of discovered nodes
-                    interface_details["discovered_nodes"].append(msg["uid"])
-                    interface_details["discovered_nodes"] = list(set(interface_details["discovered_nodes"]))
-
-                    if interface_details["p2p_state"] == "searching":
-                        interface_details["discovered_nodes_srv"] = interface_details["discovered_nodes"]
-
-                    # reply with a ping response message
-                    self.send_msg_srv("ping_resp", msg["uid"], interface_details["ipop_state"]["_uid"], interface_name)
-                    log = "recv ping: {0}".format(msg["uid"])
-                    self.registerCBT('Logger', 'debug', log)
-
-                # handle ping response
-                elif msg_type == "ping_resp":
-                    # add source node to the list of discovered nodes
-                    interface_details["discovered_nodes"].append(msg["uid"])
-                    interface_details["discovered_nodes"] = list(set(interface_details["discovered_nodes"]))
-
-                    if interface_details["p2p_state"] == "searching":
-                        interface_details["discovered_nodes_srv"] = interface_details["discovered_nodes"]
-                    log = "recv ping_resp from {0}".format(msg["uid"])
-                    self.registerCBT('Logger', 'debug', log)
-                '''
                 # Remove Offline peer node
                 if msg_type == "offline_peer":
                     if msg["uid"] in interface_details["discovered_nodes"]:
@@ -417,7 +393,7 @@ class BaseTopologyManager(ControllerModule,CFX):
                     if uid not in list(interface_details["uid_mac_table"].keys()):
                         interface_details["uid_mac_table"][uid] = []
 
-                    self.registerCBT('Logger', 'info', 'UpdateMACUIDMessage:::' + str(msg))
+                    self.registerCBT('Logger', 'debug', 'UpdateMACUIDMessage:::' + str(msg))
                     '''
                     if uid not in interface_details["online_peer_uid"] and uid != localuid:
                         nextuid = self.getnearestnode(uid, interface_name)
@@ -820,14 +796,11 @@ class BaseTopologyManager(ControllerModule,CFX):
 
     def timer_method(self):
         try:
-            #self.interval_counter += 1
-            # every <interval_management> seconds
-            #if self.interval_counter % self.CMConfig["TopologyRefreshInterval"] == 0:
             for interface_name in self.ipop_interface_details.keys():
                 if self.ipop_interface_details[interface_name]["UpdateXMPPPeerFlag"] == True:
                     self.registerCBT(self.ipop_interface_details[interface_name]["xmpp_client_code"], \
                                      "GetXMPPPeer", {"interface_name":interface_name})
-                self.registerCBT("Logger","debug","BTM Table::"+str(self.ipop_interface_details[interface_name]))
+                #self.registerCBT("Logger","debug","BTM Table::"+str(self.ipop_interface_details[interface_name]))
                 self.manage_topology(interface_name)
                 for linktype in ["successor","chord","on_demand"]:
                     for uid in self.ipop_interface_details[interface_name][linktype].keys():
@@ -840,19 +813,8 @@ class BaseTopologyManager(ControllerModule,CFX):
                         self.registerCBT('TincanInterface', 'DO_GET_STATE', message)
 
                 # periodically call policy for link removal
-                # TO DO
                 self.clean_chord(interface_name)
-                # self.clean_on_demand(interface_name)
+                #self.clean_on_demand(interface_name)  TO DO
 
-            '''
-            # every <interval_ping> seconds
-            if self.interval_counter % self.CMConfig["PeerPingInterval"] == 0:
-                # ping to repair potential network partitions
-                try:
-                    pass
-                    #self.ping()
-                except Exception as error_msg:
-                    self.registerCBT('Logger', 'error', "Exception in PING BTM timer:" + str(error_msg))
-            '''
         except Exception as err:
             self.registerCBT('Logger', 'error', "Exception in BTM timer:" + str(err))

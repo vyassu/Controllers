@@ -82,6 +82,8 @@ class ConnectionManager(ControllerModule):
             }
         elif conn_details["peers"][uid]["con_status"] not in ["offline", "online"]:
             conn_details["peers"][uid]["ttl"] = ttl
+        else:
+            return
 
         try:
             self.send_msg_srv("con_req", uid, json.dumps(msg),interface_name)
@@ -222,27 +224,15 @@ class ConnectionManager(ControllerModule):
                                 uid)
                             self.registerCBT('Logger', 'warning', log_msg)
                             self.remove_connection(uid, interface_name)
-                            '''
-                            if uid in peer.keys():
-                                peer.pop(uid)
-                                self.registerCBT("ConnectionManager", "remove_connection", remove_link_msg)
-                            '''
-                # if node was in any other state:
-                # replied or ignored a concurrent send request:
-                #    conc_no_response, conc_sent_response
-                # or if status is online or offline,
-                # remove link and wait to try again
+
+                    #if node was in any other state replied or ignored a concurrent send request [conc_no_response, conc_sent_response]
+                    #or if status is online or offline, remove link and wait to try again
                 else:
                     if peer[uid]["con_status"] in ["conc_sent_response", "conc_no_response"]:
                         log_msg = "AIL: Giving up, remove_connection from {0}".format(uid)
                         self.registerCBT('Logger', 'info', log_msg)
                         self.remove_connection(uid, interface_name)
-                        '''
-                        if uid in self.ipop_interface_details[interface_name]["peers"]:
-                            self.ipop_interface_details[interface_name]["peers"].pop(uid)
-                            self.registerCBT("ConnectionManager", "remove_connection", remove_link_msg)
-                            # recvd con_req and sender is not in peers list - common case
-                        '''
+
             else:
                 # add peer to peers list and set status as having received and
                 # responded to con_req
@@ -384,23 +374,14 @@ class ConnectionManager(ControllerModule):
                 self.registerCBT('BroadCastForwarder', 'peer_list', cbtdt)
 
     def timer_method(self):
-        #try:
+        try:
             for interface_name in self.connection_details.keys():
-                self.registerCBT("Logger","info","Peer Nodes:: {0}".format(self.connection_details[interface_name]["peers"]))
-                '''
-                peer_list = list(self.connection_details[interface_name]["peers"].keys())
-                for uid in peer_list:
-                    message = {
-                                "interface_name": interface_name,
-                                "MAC": self.connection_details[interface_name]["peers"][uid]["mac"],
-                                "uid": uid}
-                    self.registerCBT('TincanInterface', 'DO_GET_STATE', message)
-                '''
+                #self.registerCBT("Logger","info","Peer Nodes:: {0}".format(self.connection_details[interface_name]["peers"]))
                 self.clean_connection(interface_name)
                 self.advertise(interface_name)
-        #except Exception as err:
-            #self.registerCBT('Logger', 'error', "Exception in Connection Manager timer thread.\
-                             #Err: {0}".format(str(err)))
+        except Exception as err:
+            self.registerCBT('Logger', 'error', "Exception caught in Connection Manager timer thread.\
+                             Error: {0}".format(str(err)))
 
     def terminate(self):
         pass
