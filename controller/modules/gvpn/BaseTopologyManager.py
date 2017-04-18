@@ -1,6 +1,6 @@
 from controller.framework.ControllerModule import ControllerModule
 from controller.framework.CFx import CFX
-import time,math,json,random,binascii,stun
+import time,math,json,random,binascii
 from threading import Lock
 
 global btmlock
@@ -31,6 +31,7 @@ class BaseTopologyManager(ControllerModule,CFX):
             interface_details = self.ipop_interface_details[interface_name]
             interface_details["p2p_state"] = "started"
             interface_details["GeoIP"] = ""
+            interface_details["ipop_state"] = {}
             interface_details["discovered_nodes"] = []
             interface_details["UpdateXMPPPeerFlag"] = False
             interface_details["log_chords"] = []
@@ -197,10 +198,12 @@ class BaseTopologyManager(ControllerModule,CFX):
     # Gets GEO Location IP (needed by Visualizer Module)
     def getGeoIP(self):
         try:
-            stun_details = self.CFxHandle.queryParam("VirtualNetworkInitializer", "Stun")[0].split(":")
-            nat_type, external_ip, external_port = stun.get_ip_info(stun_host=stun_details[0],
-                                                                    stun_port=int(stun_details[1]))
-            return external_ip
+            #TO DO implement GEOIP from CAS
+            #stun_details = self.CFxHandle.queryParam("VirtualNetworkInitializer", "Stun")[0].split(":")
+            #nat_type, external_ip, external_port = stun.get_ip_info(stun_host=stun_details[0],
+                                                                    #stun_port=int(stun_details[1]))
+            #return external_ip
+            return ""
         except Exception as err:
             self.registerCBT("Logger", "error", "Exception caught retrieving GeoIP:{0}".format(err))
             return ""
