@@ -284,8 +284,14 @@ class TincanInterface(ControllerModule):
                             "status": "offline",
                             "interface_name": interface_name
                         }
-                        # self.registerCBT('BaseTopologyManager', 'TINCAN_CONTROL', msg)
-
+                        return
+                    elif req_operation in ["CreateCtrlRespLink","ConfigureLogging","CreateVnet","SetIgnoredNetInterfaces"]:
+                        self.registerCBT("Logger","info","recv data from Tincan for operation: {0}. Task status::{1}".format(req_operation,tincan_resp_msg["Response"]))
+                        return
+                    else:
+                        log = '{0}: unrecognized Data {1} received from {2}. Data:::{3}' \
+                            .format(cbt.recipient, cbt.action, cbt.initiator, cbt.data)
+                        self.registerCBT('Logger', 'warning', log)
                 else:
                     log = 'Tincan Failure:: '.format(cbt.data)
                     self.registerCBT('Logger', 'warning', log)
@@ -373,7 +379,6 @@ class TincanInterface(ControllerModule):
                     log = '{0}: unrecognized Data {1} received from {2}. Data:::{3}' \
                         .format(cbt.recipient, cbt.action, cbt.initiator, cbt.data)
                     self.registerCBT('Logger', 'warning', log)
-
         else:
             log = '{0}: unrecognized CBT {1} received from {2}'\
                     .format(cbt.recipient, cbt.action, cbt.initiator)

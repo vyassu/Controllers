@@ -41,7 +41,6 @@ class CFX(object):
 
         # check for circular dependencies in the configuration file
         dependency_graph = {}
-        print(self.CONFIG)
         for key in self.CONFIG:
             if(key != 'CFx'):
                 try:
@@ -78,7 +77,6 @@ class CFX(object):
             try:
                 module = importlib.import_module("controller.modules.{0}".format(module_name))
             except ImportError as error:
-                print("Exception caught in CFX module:{0}".format(error.message))
                 if self.vpn_type == "GroupVPN":
                     module = importlib.import_module("controller.modules.gvpn.{0}".format(module_name))
                 elif self.vpn_type == "SocialVPN":
@@ -269,7 +267,7 @@ class CFX(object):
                 else:
                     return self.CONFIG[ModuleName][ParamName]
         except Exception as error:
-            print("Exception occurred while querying data."+str(error.message))
+            print("Exception occurred while querying data."+str(error))
             return None
 
 if __name__=="__main__":

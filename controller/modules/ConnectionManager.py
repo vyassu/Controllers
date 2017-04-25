@@ -62,15 +62,6 @@ class ConnectionManager(ControllerModule):
 
         # Connection Request Message
         ttl = time.time() + self.CMConfig["InitialLinkTTL"]
-        msg = {
-                "con_type": con_type,
-                "peer_uid": uid,
-                "interface_name": interface_name,
-                "ip4": conn_details["ipop_state"]["_ip4"],
-                "fpr": conn_details["ipop_state"]["_fpr"],
-                "mac": conn_details["mac"],
-                "ttl": ttl
-        }
 
         # peer is not in the peers list
         if uid not in conn_details["peers"].keys():
@@ -81,11 +72,21 @@ class ConnectionManager(ControllerModule):
                     "con_status": "sent_con_req",
                     "mac": ""
             }
-        elif conn_details["peers"][uid]["con_status"] not in ["offline", "online"]:
+        # check whether the connection request is for peer already in the table but not in connected state
+        elif conn_details["peers"][uid]["con_status"] != "online":
             conn_details["peers"][uid]["ttl"] = ttl
         else:
             return
 
+        msg = {
+            "con_type": con_type,
+            "peer_uid": uid,
+            "interface_name": interface_name,
+            "ip4": conn_details["ipop_state"]["_ip4"],
+            "fpr": conn_details["ipop_state"]["_fpr"],
+            "mac": conn_details["mac"],
+            "ttl": ttl
+        }
         try:
             self.send_msg_srv("con_req", uid, json.dumps(msg),interface_name)
             log = "sent con_req ({0}): {1}".format(con_type, uid)
@@ -290,7 +291,6 @@ class ConnectionManager(ControllerModule):
             "src_uid": self.connection_details[interface_name]["ipop_state"]["_uid"],
             "peer_list": peer_list
         }
-
         for peer in peer_list:
             self.send_msg_icc(peer, new_msg,interface_name)
 
@@ -356,6 +356,14 @@ class ConnectionManager(ControllerModule):
                          }
 
                 self.registerCBT('BroadCastForwarder', 'peer_list', cbtdt)
+            else:
+                log = '{0}: unrecognized CBT message {1} received from {2}.Data:: {3}' \
+                    .format(cbt.recipient, cbt.action, cbt.initiator, cbt.data)
+                self.registerCBT('Logger', 'warning', log)
+        else:
+            log = '{0}: unrecognized CBT message {1} received from {2}.Data:: {3}' \
+                    .format(cbt.recipient, cbt.action, cbt.initiator, cbt.data)
+            self.registerCBT('Logger', 'warning', log)
 
     def timer_method(self):
         try:

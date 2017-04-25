@@ -332,9 +332,8 @@ class BaseTopologyManager(ControllerModule,CFX):
                     # Send MAC Address to NodeDiscovery module
                     self.registerCBT("NodeDiscovery", "getlocalmacaddress",
                                      {"interface_name": interface_name, "localmac": msg["mac"]})
-                    self.registerCBT("Logger", "info", "Local Node Info UID:{0} MAC:{1} IP4: {2}".format(msg["_uid"], \
-                                                                                                         msg["mac"],
-                                                                                                         msg["_ip4"]))
+                    self.registerCBT("Logger", "info", "Local Node Info UID:{0} MAC:{1} IP4: {2}".format(msg["_uid"], msg["mac"],
+                                    msg["_ip4"]))
                 # update peer list
                 elif msg_type == "peer_state":
                     uid = msg["uid"]
@@ -487,7 +486,7 @@ class BaseTopologyManager(ControllerModule,CFX):
                             self.add_outbound_link("chord", msg["src_uid"], interface_name)
 
                 elif msg_type == "add_on_demand":
-                    self.add_outbound_link("on_demand",msg["uid"], msg["interface_name"])
+                    self.add_outbound_link("on_demand", msg["uid"], msg["interface_name"])
 
                 else:
                     log = '{0}: unrecognized CBT message {1} received from {2}.Data:: {3}' \
@@ -497,8 +496,8 @@ class BaseTopologyManager(ControllerModule,CFX):
         elif cbt.action == "get_visualizer_data":
             for interface_name in self.ipop_interface_details.keys():
                 interface_details = self.ipop_interface_details[interface_name]
-                local_uid           = interface_details["ipop_state"]["_uid"]
-                local_ip            = interface_details["ipop_state"]["_ip4"]
+                local_uid = interface_details["ipop_state"]["_uid"]
+                local_ip  = interface_details["ipop_state"]["_ip4"]
                 unmanaged_node_list,successors, chords, on_demands = [], [], [],[]
 
                 # Iterate over the IP-UID Table to retrieve Unmanaged node IP list
@@ -680,8 +679,8 @@ class BaseTopologyManager(ControllerModule,CFX):
         interface_details = self.ipop_interface_details[interface_name]
         uid = interface_details["ipop_state"]["_uid"]
         nxt_uid = uid
-        online_peer_list = interface_details["successor"].keys()+interface_details["chord"].keys()+ \
-                           interface_details["on_demand"].keys()
+        online_peer_list = list(interface_details["successor"].keys())+list(interface_details["chord"].keys())+ \
+                           list(interface_details["on_demand"].keys())
         for peer in sorted(online_peer_list):
             if self.linked(peer, interface_name):
                 if peer == dst_uid:
@@ -735,9 +734,10 @@ class BaseTopologyManager(ControllerModule,CFX):
     def manage_topology(self, interface_name):
         log = "Inside Manager Topology"
         self.registerCBT('Logger', 'info', log)
-
         interface_details = self.ipop_interface_details[interface_name]
 
+        online_peer_list = list(interface_details["successor"].keys()) + list(interface_details["chord"].keys()) + \
+                           list(interface_details["on_demand"].keys())
         # discover nodes (from XMPP)
         if interface_details["p2p_state"] == "started":
             if not interface_details["ipop_state"]:
@@ -762,9 +762,6 @@ class BaseTopologyManager(ControllerModule,CFX):
                              format(interface_details["discovered_nodes"]))
             self.registerCBT('Logger', 'info', interface_name + " p2p state: connecting")
 
-            # trim offline/stale connections
-            #self.clean_links(interface_name)
-
             # attempt to bootstrap
             try:
                 self.add_successors(interface_name)
@@ -772,30 +769,27 @@ class BaseTopologyManager(ControllerModule,CFX):
                 self.registerCBT('Logger', 'error', "Exception in add_successors")
 
             # wait until atleast one successor or on-demand link is created
-            if len(interface_details["successor"].keys()+interface_details["on_demand"].keys())\
-                    !=0:
-                interface_details["p2p_state"] = "connected"
-                return
+            for peer in sorted(online_peer_list):
+                if self.linked(peer, interface_name):
+                    interface_details["p2p_state"] = "connected"
+                    self.registerCBT('Logger', 'info', interface_name + " p2p state: CONNECTED")
+                    return
 
         # connecting or connected to the IPOP peer-to-peer network; manage local topology
         if interface_details["p2p_state"] == "connected":
-            # trim offline connections
-            #self.clean_links(interface_name)
-
             # manage successors
             self.add_successors(interface_name)
             self.remove_successors(interface_name)
-
-            if len(interface_details["successor"].keys() + interface_details["on_demand"].keys()+\
-                           interface_details["chord"].keys())  == 0:
-                interface_details["p2p_state"] = "connecting"
-                self.registerCBT('Logger', 'info', interface_name + " p2p state: DISCONNECTED")
-            else:
-                self.registerCBT('Logger', 'info', interface_name + " p2p state: CONNECTED")
-
             # manage chords
             self.find_chords(interface_name)
-            # self.registerCBT("ConnectionManager", "find_chord", req_msg)
+
+            for peer in sorted(online_peer_list):
+                if self.linked(peer, interface_name):
+                    interface_details["p2p_state"] = "connected"
+                    self.registerCBT('Logger', 'info', interface_name + " p2p state: CONNECTED")
+                    return
+            interface_details["p2p_state"] = "connecting"
+            self.registerCBT('Logger', 'info', interface_name + " p2p state: DISCONNECTED")
 
     def timer_method(self):
         try:

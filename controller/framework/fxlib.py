@@ -35,15 +35,15 @@ CONFIG = {
     },
     "BroadCastForwarder": {
         "Enabled": True,
-        "dependencies": [ "Logger" ]
+        "dependencies": [ "Logger","VirtualNetworkInitializer","TincanInterface" ]
     },
     "NodeDiscovery": {
         "Enabled": True,
-        "dependencies": [ "Logger" ]
+        "dependencies": [ "Logger","VirtualNetworkInitializer","TincanInterface" ]
     },
     "IPMulticast": {
         "Enabled": True,
-        "dependencies": ["Logger"]
+        "dependencies": [ "Logger","VirtualNetworkInitializer","TincanInterface" ]
     },
     "XmppClient": {
         "Enabled": True,
@@ -51,13 +51,13 @@ CONFIG = {
     },
     "ConnectionManager": {
         "Enabled": True,
-        "TimerInterval": 5,
+        "TimerInterval": 20,
         "InitialLinkTTL": 120,
         "ChordLinkTTL": 180,
         "LinkPulse": 180,
         "OndemandLinkRateThreshold": 128,
         "MaxConnRetry": 5,
-        "dependencies": ["Logger"]
+        "dependencies": [ "Logger","VirtualNetworkInitializer","TincanInterface","BaseTopologyManager" ]
     },
     "BaseTopologyManager": {
         "Enabled": True,
@@ -68,14 +68,13 @@ CONFIG = {
         "InitialLinkTTL": 120,
         "LinkPulse": 180,
         "OnDemandLinkTTL": 60,
-        "TimerInterval": 1,
-        "TopologyRefreshInterval": 15,
+        "TimerInterval": 15,
         "OndemandThreshold":1000,
         "OndemandConnectionWaitTime": 15,
         "NumberOfPingsToPeer": 5,
         "PeerPingInterval": 300,
         "MaxConnRetry": 5,
-        "dependencies": [ "Logger" ]
+        "dependencies": [ "Logger","VirtualNetworkInitializer","TincanInterface" ]
     },
     "OverlayVisualizer": {
         "Enabled": False,

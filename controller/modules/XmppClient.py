@@ -203,8 +203,6 @@ class XmppClient(ControllerModule):
             # target_uid - what it percieves as my uid
             try:
                 peer_uid, target_uid = payload.split("#")
-                print(peer_uid)
-                print(xmppObj["uid"])
                 if peer_uid != xmppObj["uid"]:
                     if peer_uid not in xmppObj["uid_jid"].keys():
                         # self.update_peerlist= True
@@ -267,25 +265,6 @@ class XmppClient(ControllerModule):
                 self.registerCBT('BaseTopologyManager', 'XMPP_MSG', msg)
                 self.log("recvd con_resp from {0}".format(msg["uid"]), severity=log_level)
 
-            '''
-            elif (msg_type == "ping_resp"):
-                msg = {}
-                msg["uid"] = sender_uid
-                msg["data"] = recvd_data
-                msg["type"] = "ping_resp"
-                msg["interface_name"] = interface_name
-                self.registerCBT('BaseTopologyManager', 'XMPP_MSG', msg)
-                self.log("recvd ping_resp from {0}".format(msg["uid"]), severity=log_level)
-
-            elif (msg_type == "ping"):
-                msg = {}
-                msg["uid"] = sender_uid
-                msg["data"] = recvd_data
-                msg["type"] = "ping"
-                msg["interface_name"] = interface_name
-                self.registerCBT('BaseTopologyManager', 'XMPP_MSG', msg)
-                self.log("recvd ping from {0}".format(msg["uid"]), severity=log_level)
-            '''
 
     def sendMsg(self, peer_jid, xmppObj,setup_load=None, msg_payload=None):
         if (setup_load == None):
@@ -357,22 +336,20 @@ class XmppClient(ControllerModule):
                 msg_payload = node_uid + "#" + data
                 self.sendMsg(peer_jid, self.ipop_xmpp_details[interface_name]["XMPPObj"], setup_load, msg_payload)
                 self.log("sent con_ack to {0}".format(self.ipop_xmpp_details[interface_name]["uid_jid"][peer_uid]), severity=log_level)
-            elif (method == "ping_resp"):
-                setup_load = "ping_resp" + "#" + peer_uid
-                msg_payload = node_uid + "#" + data
-                self.sendMsg(peer_jid, self.ipop_xmpp_details[interface_name]["XMPPObj"], setup_load, msg_payload)
-                self.log("sent ping_resp to {0}".format(self.ipop_xmpp_details[interface_name]["uid_jid"][peer_uid]), severity=log_level)
-            elif (method == "ping"):
-                setup_load = "ping" + "#" + peer_uid
-                msg_payload = node_uid + "#" + data
-                self.sendMsg(peer_jid, self.ipop_xmpp_details[interface_name]["XMPPObj"], setup_load, msg_payload)
-                self.log("sent ping to {0}".format(self.ipop_xmpp_details[interface_name]["uid_jid"][peer_uid]), severity=log_level)
+            else:
+                log = '{0}: unrecognized CBT message {1} received from {2}.Data:: {3}' \
+                    .format(cbt.recipient, cbt.action, cbt.initiator, cbt.data)
+                self.registerCBT('Logger', 'warning', log)
         elif cbt.action == "GetXMPPPeer":
             msg = {
                     "interface_name": interface_name,
                     "peer_list"     : list(self.ipop_xmpp_details[interface_name]["uid_jid"].keys())
             }
             self.registerCBT(cbt.initiator, "UpdateXMPPPeer", msg)
+        else:
+            log = '{0}: unrecognized CBT message {1} received from {2}.Data:: {3}' \
+                    .format(cbt.recipient, cbt.action, cbt.initiator, cbt.data)
+            self.registerCBT('Logger', 'warning', log)
 
 
     def sendXmppAdvt(self, interface_name, override=False):
