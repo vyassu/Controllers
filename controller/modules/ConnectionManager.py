@@ -307,8 +307,8 @@ class ConnectionManager(ControllerModule):
             interface_name = msg["interface_name"]
             log = "recv con_req ({0}): {1}".format(msg["data"]["con_type"], uid)
             self.registerCBT('Logger', 'debug', log)
-            if uid < self.connection_details[interface_name]["ipop_state"]["_uid"]:
-                self.registerCBT('TincanInterface', 'DO_GET_CAS', msg)
+            #if uid < self.connection_details[interface_name]["ipop_state"]["_uid"]:
+            self.registerCBT('TincanInterface', 'DO_GET_CAS', msg)
 
         elif cbt.action == "create_connection":
             msg = cbt.data
@@ -323,9 +323,9 @@ class ConnectionManager(ControllerModule):
         elif cbt.action == "receive_cas_details":
             msg = cbt.data
             interface_name = msg["interface_name"]
-            self.registerCBT("BaseTopologyManager", "UpdateConnectionDetails",
-                             {"uid": msg["uid"], "interface_name": interface_name, "msg_type": "add_peer", "mac": msg["data"]["peer_mac"],
-                              "con_type": msg["data"]["con_type"]})
+            #self.registerCBT("BaseTopologyManager", "UpdateConnectionDetails",
+                             #{"uid": msg["uid"], "interface_name": interface_name, "msg_type": "add_peer", "mac": msg["data"]["peer_mac"],
+                              #"con_type": msg["data"]["con_type"]})
             self.respond_connection(msg["data"]["con_type"], msg["uid"], msg["data"],interface_name)
 
         elif cbt.action == "SendICCMessage":

@@ -285,7 +285,7 @@ class TincanInterface(ControllerModule):
                             "interface_name": interface_name
                         }
                         return
-                    elif req_operation in ["CreateCtrlRespLink","ConfigureLogging","CreateVnet","SetIgnoredNetInterfaces"]:
+                    elif req_operation in ["CreateCtrlRespLink","ConfigureLogging","CreateVnet","SetIgnoredNetInterfaces", "RemovePeer"]:
                         self.registerCBT("Logger","info","recv data from Tincan for operation: {0}. Task status::{1}".format(req_operation,tincan_resp_msg["Response"]))
                         return
                     else:
