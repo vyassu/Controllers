@@ -32,7 +32,7 @@ class BroadCastForwarder(ControllerModule):
             self.prevtimestamp.append(time)
 
     def processCBT(self, cbt):
-        if cbt.action=='peer_list':
+        if cbt.action=='ONLINE_PEERLIST':
             interface_name = cbt.data.get("interface_name")
             self.ipop_interface_details[interface_name]["peerlist"] = list(sorted(cbt.data['peerlist']))
             self.ipop_interface_details[interface_name]["mac"]      = cbt.data.get("mac")
@@ -63,8 +63,9 @@ class BroadCastForwarder(ControllerModule):
                     # Passing the message to itself.
                     self.recvPkt(data,data["message_type"],data["interface_name"])
         else:
-            self.registerCBT('Logger', 'warning', "No online peers available for broadcast.")
-            self.registerCBT('ConnectionManager', 'TINCAN_CONTROL', {"interface_name":data["interface_name"],"type": "GetOnlinePeerList"})
+            self.registerCBT('Logger', 'info', "No online peers available for broadcast.")
+            self.registerCBT('ConnectionManager', 'TINCAN_CONTROL', {"interface_name": data["interface_name"],
+                                                                     "type": "get_online_peerlist"})
 
     def forwardMessage(self,msg_frame,init_id,suc_id,peer,peer_list,time,datype,interface_name):
          self.send_count+=1

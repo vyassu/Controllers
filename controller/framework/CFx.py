@@ -1,8 +1,13 @@
 #!/usr/bin/env python
-import os,sys,json,signal
+import os
+import sys
+import json
+import signal
 import controller.framework.fxlib as fxlib
 import controller.framework.ipoplib as ipoplib
-import argparse,threading,importlib
+import argparse
+import threading
+import importlib
 from getpass import getpass
 from collections import OrderedDict
 from controller.framework.CBT import CBT as _CBT
@@ -20,6 +25,21 @@ class CFX(object):
         '''
         self.CFxHandleDict = {}
         self.vpn_type = self.CONFIG['CFx']['Model']
+        self.loaded_modules = ['CFx']  # list of modules already loaded
+        self.event = None
+        # Check whether the logger module exists in the config file
+        if "Logger" in self.CONFIG.keys():
+            if "LogOption" in self.CONFIG["Logger"].keys():
+                # Check whether the Logging is set to file
+                if self.CONFIG['Logger']["LogOption"].lower() == "file":
+                    filename = self.CONFIG['Logger'].get("LogFilePath", "./") + \
+                                 self.CONFIG['Logger'].get("LogFileName", "ctr.log")
+                    self.logfilehandle = open(filename, 'a+')
+                    sys.stderr = self.logfilehandle   # Set the standard error log to write to file
+                    sys.stdout = self.logfilehandle   # Set the standard output log to write to file
+        else:
+            print("Failed to load Controller Logger Module.")
+            sys.exit(0)
 
         
     def submitCBT(self, CBT):
@@ -35,18 +55,15 @@ class CFX(object):
         # deallocate CBT (use python's automatic garbage collector)
         pass
 
-
     def initialize(self,):
-        self.loaded_modules = ['CFx']  # list of modules already loaded
-
         # check for circular dependencies in the configuration file
         dependency_graph = {}
         for key in self.CONFIG:
-            if(key != 'CFx'):
+            if key != 'CFx':
                 try:
                     dependency_graph[key] = self.CONFIG[key]['dependencies']
-                except:
-                    pass
+                except Exception as error:
+                    print("Exception caught in CFX: {0}".format(str(error)))
 
         if self.detect_cyclic_dependency(dependency_graph):
             print("Circular dependency detected in config.json. Exiting")
@@ -107,15 +124,16 @@ class CFX(object):
         # load the dependencies of the module as specified in the configuration file
         try:
             dependencies = self.CONFIG[module_name]['dependencies']
-            for module in dependencies:
-                if module not in self.loaded_modules:
-                    self.load_module(module)
+            for module_name in dependencies:
+                if module_name not in self.loaded_modules:
+                    self.load_module(module_name)
         except KeyError:
             pass
 
     def detect_cyclic_dependency(self, g):
         # test if the directed graph g has a cycle
         path = set()
+
         def visit(vertex):
             path.add(vertex)
             for neighbour in g.get(vertex, ()):
@@ -171,42 +189,9 @@ class CFX(object):
             with open(args.config_file, "w") as f:
                 json.dump(self.CONFIG, f, indent=4, sort_keys=True)
         '''
-        if not ("Username" in self.CONFIG["XmppClient"] and
-                        "AddressHost" in self.CONFIG["XmppClient"]):
-            raise ValueError("At least XMPP 'Username' and 'AddressHost' "
-                             "must be specified in config file or string")
-        keyring_installed = False
-        try:
-            import keyring
-            keyring_installed = True
-        except:
-            print("Key-ring module is not installed")
-
-        if "Password" not in self.CONFIG["XmppClient"]:
-            xmpp_pswd = None
-            if keyring_installed:
-                xmpp_pswd = keyring.get_password("ipop",
-                                                 self.CONFIG["XmppClient"]["Username"])
-            if not keyring_installed or (keyring_installed and xmpp_pswd == None):
-                prompt = "\nPassword for %s:" % self.CONFIG["XmppClient"]["Username"]
-                if args.pwdstdout:
-                    xmpp_pswd = getpass(prompt, stream=sys.stdout)
-                else:
-                    xmpp_pswd = getpass(prompt)
-
-            if xmpp_pswd != None:
-                self.CONFIG["XmppClient"]["Password"] = xmpp_pswd
-                if keyring_installed:
-                    try:
-                        keyring.set_password("ipop", self.CONFIG["XmppClient"]["Username"],
-                                             self.CONFIG["XmppClient"]["Password"])
-                    except:
-                        print("unable to store password in keyring")
-            else:
-                raise RuntimeError("no XMPP password found")
-        '''
         if args.ip_config:
             fxlib.load_peer_ip_config(args.ip_config)
+        '''
 
     def setup_config(self, config):
         # validate config; return true if the config is modified
@@ -229,6 +214,7 @@ class CFX(object):
                 try:
                     self.event.wait(1)
                 except (KeyboardInterrupt, SystemExit) as e:
+                    print("Exception caught in CFX: {0}".format(str(e)))
                     break
         else:
             for sig in [signal.SIGINT]:
@@ -255,11 +241,18 @@ class CFX(object):
                 if self.CFxHandleDict[handle].timer_thread:
                     self.CFxHandleDict[handle].timer_thread.join()
 
+        if "Logger" in self.CONFIG.keys():
+            if "LogOption" in self.CONFIG["Logger"].keys():
+                if self.CONFIG['Logger']["LogOption"].lower() == "file":
+                    sys.stderr.close()
+                    sys.stdout.close()
+                    self.logfilehandle.close()
         sys.exit(0)
 
-    def queryParam(self, ModuleName,ParamName=""):
+
+    def queryParam(self, ModuleName, ParamName=""):
         try:
-            if ModuleName in [None,""]:
+            if ModuleName in [None, ""]:
                 return None
             else:
                 if ParamName == "":
@@ -270,6 +263,6 @@ class CFX(object):
             print("Exception occurred while querying data."+str(error))
             return None
 
-if __name__=="__main__":
+if __name__ == "__main__":
     cf = CFX()
     cf.initialize()

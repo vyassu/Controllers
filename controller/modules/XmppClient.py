@@ -1,5 +1,7 @@
 #!/usr/bin/env python
-import sys,ssl,time
+import sys
+import ssl
+import time
 from controller.framework.ControllerModule import ControllerModule
 from collections import defaultdict
 
@@ -17,82 +19,132 @@ py_ver = sys.version_info[0]
 if py_ver == 3:
     import _thread as thread
 else:
-    import thread,threading
+    import thread
 log_level = "info"
+
 
 class XmppClient(ControllerModule):
     def __init__(self, CFxHandle, paramDict, ModuleName):
         ControllerModule.__init__(self, CFxHandle, paramDict, ModuleName)
-
         xmpp_details = self.CMConfig.get("xmppdetails")
         self.ipop_xmpp_details = {}
-        for i,xmpp_ele in enumerate(xmpp_details):
+        xmpp_password = None
+        keyring_installed = False
+        # Check whether the KeyRing Module has been installed
+        try:
+            import keyring
+            keyring_installed = True
+        except:
+            self.registerCBT("Logger", "warning", "Key-ring module is not installed")
+
+        for i, xmpp_ele in enumerate(xmpp_details):
             xmpp_ele = dict(xmpp_ele)
-            interface_name  = xmpp_ele['TapName']
+            interface_name = xmpp_ele['TapName']
             self.ipop_xmpp_details[interface_name] = {}
-            if xmpp_ele.get("AuthenticationMethod") == "x509" and (xmpp_ele.get("Username",None) != None or \
-                        xmpp_ele.get("Password", None) != None):
+            if xmpp_ele.get("AuthenticationMethod") == "x509" and (xmpp_ele.get("Username", None) is not None
+                                                                   or xmpp_ele.get("Password", None) is not None):
                 raise RuntimeError("x509 Authentication Error: Username/Password in IPOP configuration file.")
 
+            # Check the Authentication Method for XMPP
             if xmpp_ele.get("AuthenticationMethod") == "x509":
-                xmppObj = sleekxmpp.ClientXMPP(xmpp_ele['Username'],xmpp_ele['Password'],sasl_mech='EXTERNAL')
-                #sleekxmpp.ClientXMPP.__init__(self, self.xmpp_host, self.xmpp_passwd, sasl_mech='EXTERNAL')
-                xmppObj.ssl_version = ssl.PROTOCOL_TLSv1                                #self.ssl_version = ssl.PROTOCOL_TLSv1
-                xmppObj.ca_certs    = xmppObj["TrustStore"]                             #self.ca_certs = self.CMConfig.get("TrustStore")
-                xmppObj.certfile    = xmppObj["CertDirectory"] + xmppObj["CertFile"]    #self.certfile = self.CMConfig.get("CertDirectory") + self.CMConfig.get("CertFile")
-                xmppObj.keyfile     = xmppObj["CertDirectory"] + xmppObj["Keyfile"]     #self.keyfile = self.CMConfig.get("CertDirectory") + self.CMConfig.get("Keyfile")
-                xmppObj.use_tls     = True
+                xmppobj = sleekxmpp.ClientXMPP(None, None, sasl_mech='EXTERNAL')
+                xmppobj.ssl_version = ssl.PROTOCOL_TLSv1
+                xmppobj.ca_certs = xmpp_ele["TrustStore"]
+                xmppobj.certfile = xmpp_ele["CertDirectory"] + xmpp_ele["CertFile"]
+                xmppobj.keyfile = xmpp_ele["CertDirectory"] + xmpp_ele["Keyfile"]
+                xmppobj.use_tls = True
             else:
-                xmppObj = sleekxmpp.ClientXMPP(xmpp_ele['Username'], xmpp_ele['Password'], sasl_mech='PLAIN')
-                #sleekxmpp.ClientXMPP.__init__(self, self.xmpp_username, self.xmpp_passwd, sasl_mech='PLAIN')
-                if xmpp_ele.get("AcceptUntrustedServer") == True:
-                    xmppObj.register_plugin("feature_mechanisms",pconfig={'unencrypted_plain': True})   #self['feature_mechanisms'].unencrypted_plain = True
-                    xmppObj.use_tls = False
+                # Check whether XMPP Username provided
+                if xmpp_ele.get("Username", None) is None:
+                    raise RuntimeError("Authentication Error: Username not provided in IPOP configuration file.")
+                # Check whether the keyring module is installed if yes extract the Password
+                if keyring_installed is True:
+                    xmpp_password = keyring.get_password("ipop", xmpp_ele['Username'])
+                # Check whether the Password exists either in Config file or inside Keyring
+                if xmpp_ele.get("Password", None) is None and xmpp_password is None:
+                    print("Authentication Error: Password not provided for XMPP "
+                                                       "Username:{0}".format(xmpp_ele['Username']))
+                    # Prompt user to enter password
+                    print("Enter Password: ",)
+                    if py_ver == 3:
+                        xmpp_password = str(input())
+                    else:
+                        xmpp_password = str(raw_input())
+
+                    xmpp_ele['Password'] = xmpp_password   # Store the userinput in the internal table
+                    if keyring_installed is True:
+                        try:
+                            # Store the password inside the Keyring
+                            keyring.set_password("ipop", xmpp_ele['Username'], xmpp_password)
+                        except Exception as error:
+                            self.registerCBT("Logger", "error", "unable to store password in keyring.Error: {0}"
+                                             .format(error))
+                xmppobj = sleekxmpp.ClientXMPP(xmpp_ele['Username'], xmpp_ele['Password'], sasl_mech='PLAIN')
+                # Check whether Server SSL Authenication required
+                if xmpp_ele.get("AcceptUntrustedServer") is True:
+                    xmppobj.register_plugin("feature_mechanisms", pconfig={'unencrypted_plain': True})
+                    xmppobj.use_tls = False
                 else:
-                    xmppObj.ca_certs = xmpp_ele["TrustStore"]
+                    xmppobj.ca_certs = xmpp_ele["TrustStore"]
 
-            register_stanza_plugin(Message, Ipop_Msg)
-            xmppObj.registerHandler(Callback('Ipop', StanzaPath('message/Ipop'), self.MsgListener))
-            # Register event handler for session start
-            xmppObj.add_event_handler("session_start", self.start)      #self.add_event_handler("session_start", self.start)
-            xmppObj.add_event_handler("roster_update", self.deletepeerjid) #self.add_event_handler("roster_update", self.deletepeerjid)
+            # Register event handler for session start and Roster Update in case a user gets unfriended
+            xmppobj.add_event_handler("session_start", self.start)
+            xmppobj.add_event_handler("roster_update", self.updateroster)
 
-            self.ipop_xmpp_details[interface_name]["XMPPObj"]    = xmppObj
-            self.ipop_xmpp_details[interface_name]["username"]   = xmpp_ele["Username"]
-            self.ipop_xmpp_details[interface_name]["xmpp_peers"] = defaultdict(lambda: [0, False])
-            self.ipop_xmpp_details[interface_name]["uid_jid"]    = {}
-            self.ipop_xmpp_details[interface_name]["jid_uid"]    = defaultdict(lambda: ['', False, 1])
+            self.ipop_xmpp_details[interface_name]["XMPPObj"] = xmppobj     # Store the Sleekxmpp object in the Table
+            # Store XMPP UserName (required to extract TapInterface from the XMPP server message)
+            self.ipop_xmpp_details[interface_name]["username"] = xmpp_ele["Username"]
+            # Store Online Peers as seen by the XMPP Server
+            self.ipop_xmpp_details[interface_name]["online_xmpp_peers"] = []
+            # Flag to indicate there is change in the Online Peer List
+            self.ipop_xmpp_details[interface_name]["update_xmpppeerlist_flag"] = False
+            # Store the JIDs seen by the node
+            self.ipop_xmpp_details[interface_name]["xmpp_peers"] = {}
+            # Table to store Peer UID their corresponding JID (Needed while sending XMPP Message)
+            self.ipop_xmpp_details[interface_name]["uid_jid"] = {}
+            # Flag to check whether the XMPP Callback for various functionalities have been set
             self.ipop_xmpp_details[interface_name]["callbackinit"] = False
-            self.ipop_xmpp_details[interface_name]["last_sent_advt"] = 0
-            # keeps track of if xmpp advt recvd in interval
-            self.ipop_xmpp_details[interface_name]["xmpp_advt_recvd"] = True
-            # Initial ADVT Delay
-            self.ipop_xmpp_details[interface_name]["INITIAL_ADVT_DELAY"] = 5
-            # interval between sending advertisements
-            self.ipop_xmpp_details[interface_name]["advt_delay"] = 5
-            # Maximum delay between advertisements is 10 minutes
-            self.ipop_xmpp_details[interface_name]["MAX_ADVT_DELAY"] = 120
-
+            # Stores the XMPP message limit after which the advrt delay is increased for Peer Nodes
+            self.ipop_xmpp_details[interface_name]["MessagePerIntervalDelay"] = \
+                xmpp_ele.get("MessagePerIntervalDelay", self.CMConfig.get("MessagePerIntervalDelay"))
+            # Initial interval between sending advertisements from ipop config file, else load from fxlib.py
+            self.ipop_xmpp_details[interface_name]["initialadvrtdelay"] = \
+                xmpp_ele.get("InitialAdvertismentDelay", self.CMConfig.get("InitialAdvertismentDelay"))
+            # Table to store Peer JID as key, Peer UID, xmpp advrt delay and xmpp advrt received as value
+            self.ipop_xmpp_details[interface_name]["jid_uid"] = defaultdict(lambda: ['', False, 0,
+                                            self.ipop_xmpp_details[interface_name]["initialadvrtdelay"]])
+            # Steady state interval between sending advertisements from ipop config file, else load from fxlib.py
+            self.ipop_xmpp_details[interface_name]["advrtdelay"] = \
+                xmpp_ele.get("XmppAdvrtDelay", self.CMConfig.get("XmppAdvrtDelay"))
+            # Maximum delay between advertisements from ipop config file else, load from fxlib.py
+            self.ipop_xmpp_details[interface_name]["maxadvrtdelay"] = \
+                xmpp_ele.get("MaxAdvertismentDelay", self.CMConfig.get("MaxAdvertismentDelay"))
+            # Query VirtualNetwork Interface details from VirtualNetworkInitializer module
             ipop_interfaces = self.CFxHandle.queryParam("VirtualNetworkInitializer", "Vnets")
+            # Iterate over the entire VirtualNetwork Interface List
             for interface_details in ipop_interfaces:
+                # Check whether the TapName given in the XMPPClient and VirtualNetworkInitializer module if yes load UID
                 if interface_details["TapName"] == interface_name:
                     self.ipop_xmpp_details[interface_name]["uid"] = interface_details["uid"]
-            self.xmpp_handler(xmpp_ele,xmppObj)
+            # Connect to the XMPP server
+            self.xmpp_handler(xmpp_ele, xmppobj)
 
     # Triggered at start of XMPP session
     def start(self, event):
         try:
             for xmpp_detail in list(self.ipop_xmpp_details.values()):
-                if xmpp_detail["callbackinit"] == False:
-                    xmpp_detail["callbackinit"]=True
+                if xmpp_detail["callbackinit"] is False:
+                    xmpp_detail["callbackinit"] = True
                     xmpp_detail["XMPPObj"].get_roster()
                     xmpp_detail["XMPPObj"].send_presence()
                     xmpp_detail["XMPPObj"].add_event_handler("presence_available", self.handle_presence)
-                    xmpp_detail["XMPPObj"].add_event_handler("presence_unavailable", self.removepeerjid)
+                    xmpp_detail["XMPPObj"].add_event_handler("presence_unavailable", self.offline_xmpp_peers)
+                    register_stanza_plugin(Message, IpopMsg)
+                    xmpp_detail["XMPPObj"].registerHandler(Callback('Ipop', StanzaPath('message/Ipop'), self.xmppmessagelistener))
         except Exception as err:
-            self.log("Exception in XMPPClient:".format(err), severity="error")
+            self.log("Exception in XMPPClient:{0} Event:{1}".format(err, event), severity="error")
 
-    # will need to handle presence, to keep track of who is online.
+    # Callback Function to keep track of Online XMPP Peers
     def handle_presence(self, presence):
         try:
             presence_sender = presence['from']
@@ -100,69 +152,78 @@ class XmppClient(ControllerModule):
             presence_receiver = str(presence_receiver_jid.user)+"@"+str(presence_receiver_jid.domain)
             for xmpp_details in self.ipop_xmpp_details.values():
                 if presence_receiver == xmpp_details["username"]:
-                    if xmpp_details["xmpp_peers"][presence_sender][1] == False:
-                        xmpp_details["xmpp_peers"][presence_sender] = [time.time(), True]
-                        self.log("presence received from {0}".format(presence_sender), severity=log_level)
+                    xmpp_details["xmpp_peers"][presence_sender] = time.time() + xmpp_details["initialadvrtdelay"]
+                    self.log("presence received from {0}".format(presence_sender), severity=log_level)
         except Exception as err:
             self.log("Exception in XMPPClient:".format(err), severity="error")
 
-    # Call Remove connection once the Peer has been deleted from the friend list(Roster)
-    def deletepeerjid(self,message):
+    # Callback Function to update XMPP Roster information
+    def updateroster(self, message):
         try:
-            self.log("XMPP server Message::"+str(message))
-            for nodejid,data in message["roster"]["items"].items():
+            self.log("XMPP Message: Update Roster: {0}".format(str(message)), severity="debug")
+            presence_receiver_jid = JID(message['to'])
+            presence_receiver = str(presence_receiver_jid.user) + "@" + str(presence_receiver_jid.domain)
+            interface_name, xmppobj = "", None
+            for tapName, xmpp_details in list(self.ipop_xmpp_details.items()):
+                if presence_receiver == xmpp_details["username"]:
+                    xmppobj = xmpp_details
+                    interface_name = tapName
+                    break
+            # check whether Server Message has a matching key in the XMPP Table if not stop processing
+            if xmppobj is None:
+                return
+            # iterate across the roster details to find unsubscribe JIDs
+            for nodejid, data in message["roster"]["items"].items():
                 if data["subscription"] == "remove":
-                    for ele in self.jid_uid.keys():
+                    for ele in list(xmppobj["jid_uid"].keys()):
                         tempjid = JID(ele)
                         jid = str(tempjid.user)+"@"+str(tempjid.domain)
-                        if jid.find(str(nodejid)) !=-1:
-                            node_uid = self.jid_uid[ele][0]
-                            del self.jid_uid[ele]
-                            del self.xmpp_peers[ele]
-                            if node_uid in self.uid_jid.keys():
-                                del self.uid_jid[node_uid]
-                                self.update_peerlist = True
-                                self.registerCBT("Logger","info","{0} has been deleted from the roster.".format(node_uid))
-                                self.registerCBT("ConnectionManager","remove_connection",\
-                                                 {"interface_name":self.interface_name,"uid":node_uid})
+                        if jid.find(str(nodejid)) != -1:
+                            node_uid = xmppobj[ele][0]
+                            del xmppobj["jid_uid"][ele]
+                            del xmppobj["xmpp_peers"][ele]
+                            if node_uid in xmppobj["uid_jid"].keys():
+                                del xmppobj["uid_jid"][node_uid]
+                                self.registerCBT("Logger", "info", "{0} has been deleted from the roster.".
+                                                 format(node_uid))
                                 msg = {
                                     "uid": node_uid,
                                     "type": "offline_peer",
-                                    "interface_name": self.interface_name
+                                    "interface_name": interface_name
                                 }
                                 self.registerCBT("BaseTopologyManager", "XMPP_MSG", msg)
-
+                            # Remove the peer from XMPP Online Peerlist if it exists
+                            if node_uid in xmppobj["online_xmpp_peers"]:
+                                xmppobj["online_xmpp_peers"].remove(node_uid)
         except Exception as err:
-            self.log("Exception in deletepeerjid method.{0}".format(err),severity="error")
+            self.log("Exception in deletepeerjid method.{0}".format(err), severity="error")
 
-    # Remove the Offline Peer from the internal dictionary
-    def removepeerjid(self,message):
+    # Callback function to keep track of Peer Offline events sent by the XMPP server
+    def offline_xmpp_peers(self, message):
         try:
             peerjid = message["from"]
-            self.log("Peer JID {0} offline".format(peerjid))
-
+            self.log("Peer JID {0} offline".format(peerjid), severity="info")
             presence_receiver_jid = JID(message['to'])
             presence_receiver = str(presence_receiver_jid.user) + "@" + str(presence_receiver_jid.domain)
-            interface_name =""
-            for tapName,xmpp_details in list(self.ipop_xmpp_details.items()):
+            interface_name, xmppobj = "", None
+            for tapName, xmpp_details in list(self.ipop_xmpp_details.items()):
                 if presence_receiver == xmpp_details["username"]:
-                    xmppObj = xmpp_details
+                    xmppobj = xmpp_details
                     interface_name = tapName
                     break
-            if peerjid in xmppObj["xmpp_peers"].keys():
-                del xmppObj["xmpp_peers"][peerjid]
+            # check whether Server Message has a matching key in the XMPP Table if not stop processing
+            if xmppobj is None:
+                return
+            if peerjid in xmppobj["xmpp_peers"].keys():
+                del xmppobj["xmpp_peers"][peerjid]
 
-            if peerjid in xmppObj["jid_uid"].keys():
-                uid = xmppObj["jid_uid"][peerjid][0]
-                del xmppObj["jid_uid"][peerjid]
-                if uid in xmppObj["uid_jid"].keys():
-                    del xmppObj["uid_jid"][uid]
-                    #self.update_peerlist = True
-                    self.registerCBT("BaseTopologyManager", "UpdateXMPPPeer",
-                                     {"update_peerlist": True, "interface_name": interface_name})
-                    self.registerCBT("ConnectionManager", "remove_connection", \
-                                     {"interface_name": interface_name, "uid": uid})
-                    self.log("Removed Peer JID: {0} UID: {1} from the JID-UID and UID-JID Table".format(peerjid, uid))
+            if peerjid in xmppobj["jid_uid"].keys():
+                uid = xmppobj["jid_uid"][peerjid][0]
+                del xmppobj["jid_uid"][peerjid]
+                if uid in xmppobj["uid_jid"].keys():
+                    del xmppobj["uid_jid"][uid]
+                    self.log("Removed Peer JID: {0} UID: {1} from the JID-UID and UID-JID Table".format(peerjid, uid),
+                             severity="info")
                     msg = {
                         "uid": uid,
                         "type": "offline_peer",
@@ -175,99 +236,87 @@ class XmppClient(ControllerModule):
     # This handler method listens for the matched messages on tehj xmpp stream,
     # extracts the setup and payload and takes suitable action depending on the
     # them.
-    def MsgListener(self, msg):
+    def xmppmessagelistener(self, msg):
         presence_receiver_jid = JID(msg['to'])
         presence_receiver = str(presence_receiver_jid.user) + "@" + str(presence_receiver_jid.domain)
-        interface_name = ""
+        interface_name, xmppobj = "", None
         for tapName, xmpp_details in list(self.ipop_xmpp_details.items()):
             if presence_receiver == xmpp_details["username"]:
-                xmppObj = xmpp_details
+                xmppobj = xmpp_details
                 interface_name = tapName
                 break
-
-        if xmppObj["uid"] == "":
-            self.log("UID not received from Tincan. Please check Tincan logs.",severity="warning")
+        # check whether Server Message has a matching key in the XMPP Table if not stop processing
+        if xmppobj is None:
             return
-
+        # Check whether Node UID obtained from CFX
+        if xmppobj["uid"] == "":
+            self.log("UID not received from Tincan. Please check Tincan logs.", severity="warning")
+            return
         # extract setup and content
         setup = str(msg['Ipop']['setup'])
         payload = str(msg['Ipop']['payload'])
         msg_type, target_uid, target_jid = setup.split("#")
         sender_jid = msg['from']
 
-        if (msg_type == "regular_msg"):
-            self.log("Recvd mesage from {0}".format(msg['from']), severity=log_level)
+        if msg_type == "regular_msg":
+            self.log("Received regular mesage from {0}".format(msg['from']), severity=log_level)
             self.log("Msg is {0}".format(payload), severity="debug")
-        elif (msg_type == "xmpp_advertisement"):
+        elif msg_type == "xmpp_advertisement":
             # peer_uid - uid of the node that sent the advt
             # target_uid - what it percieves as my uid
             try:
-                peer_uid, target_uid = payload.split("#")
-                if peer_uid != xmppObj["uid"]:
-                    if peer_uid not in xmppObj["uid_jid"].keys():
-                        # self.update_peerlist= True
-                        self.registerCBT("BaseTopologyManager", "UpdateXMPPPeer", \
-                                         {"update_peerlist": True, "interface_name": interface_name})
-                    # update last known advt reception time in xmpp_peers
-                    xmppObj["xmpp_peers"][sender_jid][0] = time.time()
-                    xmppObj["uid_jid"][peer_uid] = sender_jid
-                    xmppObj["jid_uid"][msg['from']][0] = peer_uid
+                peer_uid,target_uid = payload.split("#")
+                if peer_uid != xmppobj["uid"]:
+                #if sender_jid != target_jid:
+                    xmppobj["uid_jid"][peer_uid] = sender_jid
+                    xmppobj["jid_uid"][sender_jid][0] = peer_uid
                     # sender knows my uid, so I will not send an advert to him
-                    if target_uid == xmppObj["uid"]:
-                        xmppObj["jid_uid"][msg['from']][1] = True
+                    if target_uid == xmppobj["uid"]:
+                        xmppobj["jid_uid"][sender_jid][1] = True
                         # recvd correct advertisement
-                        xmppObj["jid_uid"][msg['from']][2] += 1
+                        xmppobj["jid_uid"][sender_jid][2] += 1
+                        # update last known advt reception time in xmpp_peers
+                        xmppobj["xmpp_peers"][sender_jid] += self.ipop_xmpp_details[interface_name]["jid_uid"][sender_jid][3]
+                        self.log("XMPP Message: Received advertisement from peer {0}".format(peer_uid),
+                                 severity=log_level)
                     else:
-                        xmppObj["jid_uid"][msg['from']][1] = False
-                    # refresh xmpp advt recvd flag
-                    self.ipop_xmpp_details[interface_name]["xmpp_advt_recvd"] = True
-                    self.log("recvd xmpp_advt from {0}".format(peer_uid), severity=log_level)
-
-            except:
-                self.log("advt_payload: {0}".format(payload), severity="error")
+                        xmppobj["jid_uid"][msg['from']][1] = False
+            except Exception as error:
+                self.log("Exception caught while processing advt_payload: {0}. Error: {1}".format(payload, str(error)),
+                         severity="error")
 
         # compare uid's here , if target uid does not match with mine do nothing.
         # have to avoid loop messages.
-        if target_uid == xmppObj["uid"]:
+        if target_uid == xmppobj["uid"]:
             sender_uid, recvd_data = payload.split("#")
             # If I recvd XMPP msg from this peer, I should record his UID-JID & JID-UID
-            if sender_uid not in xmppObj["uid_jid"].keys():
-                # self.update_peerlist = True
-                self.registerCBT("BaseTopologyManager", "UpdateXMPPPeer", \
-                                 {"update_peerlist": True, "interface_name": interface_name})
-            xmppObj["uid_jid"][sender_uid] = sender_jid
-
-            if (msg_type == "con_req"):
-                msg = {}
+            if sender_uid not in xmppobj["uid_jid"].keys():
+                self.ipop_xmpp_details[interface_name]["update_xmpppeerlist_flag"] = True
+                self.ipop_xmpp_details[interface_name]["online_xmpp_peers"].append(sender_uid)
+                self.ipop_xmpp_details[interface_name]["online_xmpp_peers"] = \
+                    list(set(self.ipop_xmpp_details[interface_name]["online_xmpp_peers"]))
+                self.sendxmpppeerlist(interface_name)
+            xmppobj["uid_jid"][sender_uid] = sender_jid
+            msg = {}
+            if msg_type == "con_req":
                 msg["uid"] = sender_uid
                 msg["data"] = recvd_data
                 msg["type"] = "con_req"
                 msg["interface_name"] = interface_name
                 # send this CBT to BaseTopology Manager
-                self.registerCBT('ConnectionManager', 'respond_connection', msg)
-                self.log("recvd con_req from {0}".format(msg["uid"]), severity=log_level)
-
-            elif (msg_type == "con_ack"):
-                msg = {}
+                self.registerCBT('ConnectionManager', 'CREATE_LISTENER', msg)
+                self.log("XMPP Message: Received CAS request from peer {0}".format(msg["uid"]), severity=log_level)
+            elif msg_type == "con_ack":
                 msg["uid"] = sender_uid
                 msg["data"] = recvd_data
                 msg["type"] = "con_ack"
                 msg["interface_name"] = interface_name
-                self.registerCBT('ConnectionManager', 'create_connection', msg)
-                self.log("recvd con_ack from {0}".format(msg["uid"]), severity=log_level)
+                self.registerCBT('ConnectionManager', 'CREATE_CONNECTION', msg)
+                self.log("XMPP Message: Received CAS response from peer {0}".format(msg["uid"]), severity=log_level)
 
-            elif (msg_type == "con_resp"):
-                msg = {}
-                msg["uid"] = sender_uid
-                msg["data"] = recvd_data
-                msg["type"] = "peer_con_resp"
-                msg["interface_name"] = interface_name
-                self.registerCBT('BaseTopologyManager', 'XMPP_MSG', msg)
-                self.log("recvd con_resp from {0}".format(msg["uid"]), severity=log_level)
-
-
-    def sendMsg(self, peer_jid, xmppObj,setup_load=None, msg_payload=None):
-        if (setup_load == None):
+    # Send message to Peer JID via XMPP server
+    def sendxmppmsg(self, peer_jid, xmppobj, setup_load=None, msg_payload=None):
+        if setup_load is None:
             setup_load = "regular_msg" + "#" + "None" + "#" + peer_jid.full
         else:
             setup_load = setup_load + "#" + peer_jid.full
@@ -275,26 +324,26 @@ class XmppClient(ControllerModule):
         if py_ver != 3:
             setup_load = unicode(setup_load)
 
-        if (msg_payload == None):
-            content_load = "Hello there this is {0}".format(xmppObj.username)
+        if msg_payload is None:
+            content_load = "Hello there this is {0}".format(xmppobj.username)
         else:
             content_load = msg_payload
-
-        msg = xmppObj.Message()
+        msg = xmppobj.Message()
         msg['to'] = peer_jid.bare
         msg['type'] = 'chat'
         msg['Ipop']['setup'] = setup_load
         msg['Ipop']['payload'] = content_load
         msg.send()
-        self.log("Sent a message to  {0}".format(peer_jid), severity=log_level)
+        self.log("Sent XMPP message to {0}".format(peer_jid), severity=log_level)
 
-    def xmpp_handler(self,xmpp_details,xmppObj):
+    def xmpp_handler(self, xmpp_details, xmppobj):
         try:
-            if (xmppObj.connect(address=(xmpp_details["AddressHost"], xmpp_details["Port"]))):
-                thread.start_new_thread(xmppObj.process, ())
+            if xmppobj.connect(address=(xmpp_details["AddressHost"], xmpp_details["Port"])):
+                thread.start_new_thread(xmppobj.process, ())
                 self.log("Started XMPP handling", severity="debug")
         except Exception as err:
-            self.log("Unable to start XMPP handling thread-Check Internet connectivity/credentials."+str(err), severity='error')
+            self.log("Unable to start XMPP handling thread-Check Internet connectivity/credentials."+str(err),
+                     severity='error')
 
     def log(self, msg, severity='info'):
         self.registerCBT('Logger', severity, msg)
@@ -305,11 +354,11 @@ class XmppClient(ControllerModule):
     def processCBT(self, cbt):
         message = cbt.data
         interface_name = message.get("interface_name")
-        if (cbt.action == "DO_SEND_MSG"):
+        if cbt.action == "DO_SEND_MSG":
             if self.ipop_xmpp_details[interface_name]["uid"] == "":
-                self.log("UID not received from Tincan. Please check Tincan logs.", severity="warning")
+                self.log("UID not received from Tincan. Please check Tincan logs.", severity="error")
                 return
-            method   = message.get("method")
+            method = message.get("method")
             peer_uid = message.get("uid")
             node_uid = self.ipop_xmpp_details[interface_name]["uid"]
             if peer_uid in self.ipop_xmpp_details[interface_name]["uid_jid"].keys():
@@ -321,96 +370,114 @@ class XmppClient(ControllerModule):
                 return
             data = message.get("data")
 
-            if (method == "con_req"):
+            if method == "con_req":
                 setup_load = "con_req" + "#" + peer_uid
-                msg_payload = node_uid+ "#" + data
-                self.sendMsg(peer_jid, self.ipop_xmpp_details[interface_name]["XMPPObj"],setup_load, msg_payload)
-                self.log("sent con_req to {0}".format(self.ipop_xmpp_details[interface_name]["uid_jid"][peer_uid]), severity=log_level)
-            elif (method == "con_resp"):
-                setup_load = "con_resp" + "#" + peer_uid
                 msg_payload = node_uid + "#" + data
-                self.sendMsg(peer_jid, self.ipop_xmpp_details[interface_name]["XMPPObj"], setup_load, msg_payload)
-                self.log("sent con_resp to {0}".format(self.ipop_xmpp_details[interface_name]["uid_jid"][peer_uid]), severity=log_level)
-            elif (method == "con_ack"):
+                self.sendxmppmsg(peer_jid, self.ipop_xmpp_details[interface_name]["XMPPObj"],
+                                 setup_load, msg_payload)
+                self.log("XMPP Message: CAS Request sent to peer {0}".format(
+                    self.ipop_xmpp_details[interface_name]["uid_jid"][peer_uid]), severity=log_level)
+            elif method == "con_ack":
                 setup_load = "con_ack" + "#" + peer_uid
                 msg_payload = node_uid + "#" + data
-                self.sendMsg(peer_jid, self.ipop_xmpp_details[interface_name]["XMPPObj"], setup_load, msg_payload)
-                self.log("sent con_ack to {0}".format(self.ipop_xmpp_details[interface_name]["uid_jid"][peer_uid]), severity=log_level)
+                self.sendxmppmsg(peer_jid, self.ipop_xmpp_details[interface_name]["XMPPObj"],
+                                 setup_load, msg_payload)
+                self.log("XMPP Message: CAS Response sent to peer {0}".format(
+                    self.ipop_xmpp_details[interface_name]["uid_jid"][peer_uid]), severity=log_level)
             else:
                 log = '{0}: unrecognized CBT message {1} received from {2}.Data:: {3}' \
                     .format(cbt.recipient, cbt.action, cbt.initiator, cbt.data)
                 self.registerCBT('Logger', 'warning', log)
-        elif cbt.action == "GetXMPPPeer":
-            msg = {
+        elif cbt.action == "GetXMPPPeerList":
+            if self.ipop_xmpp_details[interface_name]["update_xmpppeerlist_flag"] is True and \
+                len(self.ipop_xmpp_details[interface_name]["online_xmpp_peers"]) > 0:
+                msg = {
                     "interface_name": interface_name,
-                    "peer_list"     : list(self.ipop_xmpp_details[interface_name]["uid_jid"].keys())
-            }
-            self.registerCBT(cbt.initiator, "UpdateXMPPPeer", msg)
+                    "peer_list": self.ipop_xmpp_details[interface_name]["online_xmpp_peers"]
+                }
+                retrieveCBTList = self.retrievePendingCBT(str(cbt.initiator) + " " + str(cbt.action))
+                # Check if there are any pending GetXMPPPeerList CBT
+                if retrieveCBTList is None:
+                    self.registerCBT(cbt.initiator, "UpdateXMPPPeerList", msg)
+                else:
+                    for cbtele in retrieveCBTList:
+                        self.registerCBT(cbtele.initiator, "UpdateXMPPPeerList", msg)
+                self.ipop_xmpp_details[interface_name]["update_xmpppeerlist_flag"] = False
+            else:
+                self.insertPendingCBT(cbt)
         else:
             log = '{0}: unrecognized CBT message {1} received from {2}.Data:: {3}' \
                     .format(cbt.recipient, cbt.action, cbt.initiator, cbt.data)
             self.registerCBT('Logger', 'warning', log)
 
-
-    def sendXmppAdvt(self, interface_name, override=False):
-        if self.ipop_xmpp_details[interface_name]["uid"] != "":
-            for peer in self.ipop_xmpp_details[interface_name]["xmpp_peers"].keys():
-                # True indicates that peer node does not knows my UID.
-                # If I have recvd more than 10 correct advertisements from peer
-                # reply back, may be my reply was lost.
-                if self.ipop_xmpp_details[interface_name]["jid_uid"][peer][1] == True and \
-                            self.ipop_xmpp_details[interface_name]["jid_uid"][peer][2] % 10 == 0:
+    # Function to send XMPP advrt to Peer
+    def sendxmppadvrt(self, xmpp_interface_details, peer):
+        if xmpp_interface_details["uid"] != "" and peer != xmpp_interface_details["XMPPObj"].boundjid.full:
+                '''
+                    True indicates that peer node does not knows my UID.
+                    If I have recvd more than 10 correct advertisements from peer
+                    reply back, may be my reply was lost.
+                '''
+                send_advt = False
+                xmpp_interface_details["jid_uid"][peer][2] += 1
+                if xmpp_interface_details["jid_uid"][peer][2] % \
+                        xmpp_interface_details["MessagePerIntervalDelay"] == 0:
+                    if xmpp_interface_details["jid_uid"][peer][3] < xmpp_interface_details["maxadvrtdelay"]:
+                        xmpp_interface_details["jid_uid"][peer][3] += xmpp_interface_details["advrtdelay"]
+                        xmpp_interface_details["jid_uid"][peer][2] = 1
                     send_advt = True
-                    self.ipop_xmpp_details[interface_name]["jid_uid"][peer][2] = 1
-                elif self.ipop_xmpp_details[interface_name]["jid_uid"][peer][1] == True and override != True:
-                    # Do not send an advt
-                    send_advt = False
-                else:
-                    # If here, peer does not knows my UID
+                elif xmpp_interface_details["jid_uid"][peer][2] == 1:
                     send_advt = True
-
-                if send_advt == True:
+                if send_advt is True:
                     setup_load = "xmpp_advertisement" + "#" + "None"
-                    msg_load = str(self.ipop_xmpp_details[interface_name]["uid"]) + "#" +\
-                               str(self.ipop_xmpp_details[interface_name]["jid_uid"][peer][0])
-                    self.sendMsg(peer, self.ipop_xmpp_details[interface_name]["XMPPObj"],setup_load, msg_load)
-                    self.log("sent xmpp_advt to {0}".format(peer), severity=log_level)
+                    msg_load = str(xmpp_interface_details["uid"]) + "#" + str(xmpp_interface_details["jid_uid"][peer][0])
+                    self.sendxmppmsg(peer, xmpp_interface_details["XMPPObj"], setup_load, msg_load)
+
+    # Extract pending GetXMPPPeerList and send the Online Peerlist
+    def sendxmpppeerlist(self, interface_name):
+        retrieveCBTList = self.retrievePendingCBT("GetXMPPPeerList")
+        msg = {
+            "interface_name": interface_name,
+            "peer_list": self.ipop_xmpp_details[interface_name]["online_xmpp_peers"]
+        }
+        # Check if there are any pending GetXMPPPeerList CBT
+        if retrieveCBTList is not None:
+            for cbt in retrieveCBTList:
+                self.registerCBT(cbt.initiator, "UpdateXMPPPeerList", msg)
+            self.ipop_xmpp_details[interface_name]["update_xmpppeerlist_flag"] = False
 
     def timer_method(self):
-
         try:
             for interface_name in self.ipop_xmpp_details.keys():
-                if (time.time() - self.ipop_xmpp_details[interface_name]["last_sent_advt"] > self.ipop_xmpp_details[interface_name]["advt_delay"]):
-                    # see if I recvd a advertisement in this time period
-                    # if yes than XMPP link is open
-                    if self.ipop_xmpp_details[interface_name]["xmpp_advt_recvd"] == True:
-                        self.sendXmppAdvt(interface_name=interface_name)
-                        # update xmpp tracking parameters.
-                        self.ipop_xmpp_details[interface_name]["last_sent_advt"] = time.time()
-                        self.ipop_xmpp_details[interface_name]["xmpp_advt_recvd"] = False
-                        self.ipop_xmpp_details[interface_name]["advt_delay"] = self.ipop_xmpp_details[interface_name]["INITIAL_ADVT_DELAY"]
-                    # Have not heard from anyone in a while, Handles XMPP disconnection
-                    # do not want to overwhelm with queued messages.
-                    elif (self.ipop_xmpp_details[interface_name]["advt_delay"] < self.ipop_xmpp_details[interface_name]["MAX_ADVT_DELAY"]):
-                        self.ipop_xmpp_details[interface_name]["advt_delay"] = 2 * self.ipop_xmpp_details[interface_name]["advt_delay"]
-                        self.log("Delaying the XMPP advt timer \
-                                to {0} seconds".format(self.ipop_xmpp_details[interface_name]["advt_delay"]))
-                    else:
-                        # send the advertisement anyway, after MaxDelay.
-                        self.sendXmppAdvt(interface_name=interface_name,override=True)
-                        # update xmpp tracking parameters.
-                        self.ipop_xmpp_details[interface_name]["last_sent_advt"] = time.time()
-                        self.ipop_xmpp_details[interface_name]["xmpp_advt_recvd"] = False
+                xmpp_details = self.ipop_xmpp_details[interface_name]
+                updatepeerflag = False
+                for peerjid in xmpp_details["xmpp_peers"].keys():
+                    # check whether Peer has sent advertisement with its UID, if not dont add it to online xmpp peerlist
+                        if time.time() > xmpp_details["xmpp_peers"][peerjid]:
+                            self.sendxmppadvrt(xmpp_interface_details=xmpp_details, peer=peerjid)
+                            # check whether peer uid is exists in online_xmpp_peer list
+                            if xmpp_details["jid_uid"][peerjid][0] not in xmpp_details["online_xmpp_peers"] \
+                                        and xmpp_details["jid_uid"][peerjid][0] not in ['', xmpp_details["uid"]]:
+                                xmpp_details["online_xmpp_peers"].append(xmpp_details["jid_uid"][peerjid][0])
+                                updatepeerflag = True
+                        else:
+                            if xmpp_details["jid_uid"][peerjid][0] in xmpp_details["online_xmpp_peers"]:
+                                xmpp_details["online_xmpp_peers"].remove(xmpp_details["jid_uid"][peerjid][0])
+                                updatepeerflag = True
+                if updatepeerflag is True:
+                    self.ipop_xmpp_details[interface_name]["update_xmpppeerlist_flag"] = True
+                    self.sendxmpppeerlist(interface_name)
+
         except Exception as error:
-            self.log("Exception in XmppClient timer.{0}".format(error.message), severity="error")
+            self.log("Exception in XmppClient timer.{0}".format(error), severity="error")
 
     def terminate(self):
         pass
 
+
 # set up a new custom message stanza
-class Ipop_Msg(ElementBase):
+class IpopMsg(ElementBase):
     namespace = "Conn_setup"
     name = 'Ipop'
     plugin_attrib = 'Ipop'
-    interfaces = set(('setup', 'payload', 'uid','TapName'))
-    subinterfaces = interfaces
+    interfaces = set(('setup', 'payload', 'uid', 'TapName'))

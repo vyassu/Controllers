@@ -1,28 +1,18 @@
 from controller.framework.ControllerModule import ControllerModule
 from controller.framework.CFx import CFX
-import time,math,json,random,binascii
-from threading import Lock
+import time
+import math
 
-global btmlock
-btmlock = Lock()
 
-class BaseTopologyManager(ControllerModule,CFX):
+class BaseTopologyManager(ControllerModule, CFX):
     def __init__(self, CFxHandle, paramDict, ModuleName):
         super(BaseTopologyManager, self).__init__(CFxHandle, paramDict, ModuleName)
         self.CFxHandle = CFxHandle
         self.CMConfig = paramDict
         self.interval_counter = 0
-        #self.cv_interval = 5
-        self.ipop_interface_details={}
-        #self.sendcount = ""
-        #self.receivecount = ""
-
-        self.max_num_links = self.CMConfig["NumberOfSuccessors"] + \
-                             self.CMConfig["NumberOfChords"] + \
-                             self.CMConfig["NumberOfOnDemand"] + \
-                             self.CMConfig["NumberOfInbound"]
-
-        #self.maxretries = self.CMConfig["MaxConnRetry"]
+        self.ipop_interface_details = {}
+        self.max_num_links = self.CMConfig["NumberOfSuccessors"] + self.CMConfig["NumberOfChords"] + \
+                             self.CMConfig["NumberOfOnDemand"] + self.CMConfig["NumberOfInbound"]
 
         self.tincanparams = self.CFxHandle.queryParam("VirtualNetworkInitializer", "Vnets")
         for k in range(len(self.tincanparams)):
@@ -35,8 +25,8 @@ class BaseTopologyManager(ControllerModule,CFX):
             interface_details["discovered_nodes"] = []
             interface_details["UpdateXMPPPeerFlag"] = False
             interface_details["log_chords"] = []
-            interface_details["successor"]   = {}
-            interface_details["chord"]       = {}
+            interface_details["successor"] = {}
+            interface_details["chord"] = {}
             interface_details["on_demand"] = {}
             interface_details["ip_uid_table"] = {}
             interface_details["uid_mac_table"] = {}
@@ -50,17 +40,17 @@ class BaseTopologyManager(ControllerModule,CFX):
         for interface_name in self.ipop_interface_details.keys():
             self.registerCBT('TincanInterface', 'DO_GET_STATE', {"interface_name": interface_name, "MAC": ""})
             self.ipop_interface_details[interface_name]["GeoIP"] = self.getGeoIP()
+            self.registerCBT(self.ipop_interface_details[interface_name]["xmpp_client_code"], "GetXMPPPeerList",
+                             {"interface_name": interface_name})
         self.registerCBT('Logger', 'info', "{0} Loaded".format(self.ModuleName))
 
     def terminate(self):
         pass
 
-
     # remove connection
     # remove a link by peer UID
-    # - uid = UID of the peer
     def remove_link(self, uid, interface_name, connection_type=None):
-        if connection_type == None:
+        if connection_type is None:
             connection_type_list = ["successor", "chord", "on_demand"]
         else:
             connection_type_list = [connection_type]
@@ -69,7 +59,7 @@ class BaseTopologyManager(ControllerModule,CFX):
             if uid in self.ipop_interface_details[interface_name][con_type].keys():
                 self.ipop_interface_details[interface_name][con_type].pop(uid)
                 message = {"uid": uid, "interface_name": interface_name}
-                self.registerCBT("ConnectionManager", "remove_connection", message)
+                self.registerCBT("ConnectionManager", "REMOVE_CONNECTION", message)
                 log = "Connection remove request for UID: {0}".format(uid)
                 self.registerCBT('Logger', 'info', log)
 
@@ -104,7 +94,7 @@ class BaseTopologyManager(ControllerModule,CFX):
                 requested_nodes.append(node)
 
         # establishing link from the smallest UID node in the network to the biggest UID in the network
-        if min([uid] + nodes) == uid and len(nodes)>1:
+        if min([uid] + nodes) == uid and len(nodes) > 1:
             for node in list(reversed(nodes))[0:self.CMConfig["NumberOfSuccessors"]]:
                 if node not in interface_details["successor"].keys():
                     self.add_outbound_link("successor", node, interface_name)
@@ -134,18 +124,15 @@ class BaseTopologyManager(ControllerModule,CFX):
             loop_counter = len(successors) / 2 + 1
 
         i = 0
-        while i < (loop_counter):
-            #if self.linked(successors[i], interface_name):
+        while i < loop_counter:
             if successors[i] not in successors:
                 num_linked_successors += 1
                 if num_linked_successors > (2 * int(self.CMConfig["num_successors"])):
                     self.remove_link(successors[i], interface_name, connection_type="successor")
             if successors[-(i + 1)] not in successors:
-            #if self.linked(successors[-(i + 1)], interface_name):
                 num_linked_successors += 1
                 if num_linked_successors > (2 * int(self.CMConfig["num_successors"])):
-                    self.remove_link(successors[-(i + 1)], interface_name,
-                                                       connection_type="successor")
+                    self.remove_link(successors[-(i + 1)], interface_name, connection_type="successor")
             i += 1
 
 ############################################################################
@@ -190,7 +177,7 @@ class BaseTopologyManager(ControllerModule,CFX):
                             "src_uid": current_node_uid,
                             "dst_uid": log_uid,
                             "log_uid": log_uid
-            }
+                        }
             }
 
             self.registerCBT("BaseTopologyManager", "forward_msg", new_msg)
@@ -198,17 +185,16 @@ class BaseTopologyManager(ControllerModule,CFX):
     # Gets GEO Location IP (needed by Visualizer Module)
     def getGeoIP(self):
         try:
-            #TO DO implement GEOIP from CAS
-            #stun_details = self.CFxHandle.queryParam("VirtualNetworkInitializer", "Stun")[0].split(":")
-            #nat_type, external_ip, external_port = stun.get_ip_info(stun_host=stun_details[0],
-                                                                    #stun_port=int(stun_details[1]))
-            #return external_ip
+            # TO DO implement GEOIP from CAS
+            # stun_details = self.CFxHandle.queryParam("VirtualNetworkInitializer", "Stun")[0].split(":")
+            # nat_type, external_ip, external_port = stun.get_ip_info(stun_host=stun_details[0],stun_port=int(stun_details[1]))
+            # return external_ip
             return ""
         except Exception as err:
             self.registerCBT("Logger", "error", "Exception caught retrieving GeoIP:{0}".format(err))
             return ""
 
-    def clean_chord(self,interface_name):
+    def clean_chord(self, interface_name):
         links = self.ipop_interface_details[interface_name]
         if not links["chord"].keys():
             return
@@ -226,38 +212,35 @@ class BaseTopologyManager(ControllerModule,CFX):
                     "dst_uid": links["chord"][uid]["log_uid"],
                     "log_uid": links["chord"][uid]["log_uid"]
                 }
-
-                #self.forward_msg("closest", links["chord"][uid]["log_uid"], new_msg,interface_name)   # TO DO LInk to BTM
                 forward_message = {
-                    "fwd_type"  : "closest",
-                    "dst_uid"   : links["chord"][uid]["log_uid"],
-                    "interface_name" : interface_name,
-                    "data" : new_msg
+                    "fwd_type": "closest",
+                    "dst_uid": links["chord"][uid]["log_uid"],
+                    "interface_name": interface_name,
+                    "data": new_msg
                 }
-                self.registerCBT("BaseTopologyManager","forward_msg", forward_message)
+                self.registerCBT("BaseTopologyManager", "forward_msg", forward_message)
 
                 # extend time-to-live attribute
                 links["chord"][uid]["ttl"] = time.time() + self.CMConfig["ttl_chord"]
-    def add_outbound_link(self, con_type,uid,interface_name):
-        self.registerCBT("ConnectionManager", "request_connection", \
-                         {"uid": uid, "interface_name": interface_name, "con_type":con_type})
+
+    def add_outbound_link(self, con_type, uid, interface_name):
+        self.registerCBT("ConnectionManager", "REQUEST_CONNECTION", {"uid": uid,
+                                                                     "interface_name": interface_name,
+                                                                     "con_type": con_type})
 
     def processCBT(self, cbt):
         msg = cbt.data
-        if cbt.action == "UpdateXMPPPeer":
+        if cbt.action == "UpdateXMPPPeerList":
             interface_name = msg["interface_name"]
-            if msg.get("update_peerlist",None) == None:
-                self.ipop_interface_details[msg["interface_name"]]["UpdateXMPPPeerFlag"] = False
-                xmpp_peer_list = msg.get("peer_list")
-                if len(xmpp_peer_list) > 0:
-                    self.ipop_interface_details[interface_name]["discovered_nodes"] += xmpp_peer_list
-                    self.ipop_interface_details[interface_name]["discovered_nodes"] = \
-                        list(set(self.ipop_interface_details[interface_name]["discovered_nodes"]))
-                else:
-                    self.ipop_interface_details[interface_name]["discovered_nodes"] = []
-
+            xmpp_peer_list = msg.get("peer_list")
+            if len(xmpp_peer_list) > 0:
+                self.ipop_interface_details[interface_name]["discovered_nodes"] += xmpp_peer_list
+                self.ipop_interface_details[interface_name]["discovered_nodes"] = \
+                    list(set(self.ipop_interface_details[interface_name]["discovered_nodes"]))
             else:
-                self.ipop_interface_details[interface_name]["UpdateXMPPPeerFlag"] = msg.get("update_peerlist")
+                self.ipop_interface_details[interface_name]["discovered_nodes"] = []
+            self.registerCBT(self.ipop_interface_details[interface_name]["xmpp_client_code"], "GetXMPPPeerList",
+                             {"interface_name": interface_name})
 
         elif cbt.action == "forward_msg":
                 msg = cbt.data
@@ -271,18 +254,18 @@ class BaseTopologyManager(ControllerModule,CFX):
                 con_type = msg.get("con_type")
 
                 if msg_type == "add_peer":
-                    self.ipop_interface_details[interface_name][con_type][uid] = {
-                        "uid": uid,
-                        "mac": mac,
-                        "ttl": time.time()+self.CMConfig["InitialLinkTTL"]
-                    }
+                    if uid not in self.ipop_interface_details[interface_name][con_type]:
+                        self.ipop_interface_details[interface_name][con_type][uid] = {
+                            "uid": uid,
+                            "mac": mac,
+                            "ttl": time.time()+self.CMConfig["InitialLinkTTL"],
+                            "status": msg.get("status", "offline")
+                        }
 
                     self.ipop_interface_details[interface_name]["uid_mac_table"][uid] = [mac]
                     self.ipop_interface_details[interface_name]["mac_uid_table"][mac] = uid
-                    self.registerCBT('Logger', 'debug', "inside add peer **********")
-                    self.registerCBT('Logger', 'info', "Peer UID {0} Added".format(uid))
+                    self.registerCBT('Logger', 'info', "**Peer UID {0} added to BTM Table as {1}**".format(uid, con_type))
                 elif msg_type == "remove_peer":
-                    self.registerCBT('Logger', 'debug', "inside remove peer************")
                     if uid in list(self.ipop_interface_details[interface_name]["successor"].keys()):
                         del self.ipop_interface_details[interface_name]["successor"][uid]
                     if uid in list(self.ipop_interface_details[interface_name]["chord"].keys()):
@@ -294,7 +277,7 @@ class BaseTopologyManager(ControllerModule,CFX):
                         for mac in maclist:
                             del self.ipop_interface_details[interface_name]["mac_uid_table"][mac]
                         del self.ipop_interface_details[interface_name]["uid_mac_table"][uid]
-                    self.registerCBT('Logger', 'info', "Peer UID {0} removed from BTM".format(uid))
+                    self.registerCBT('Logger', 'info', "**Peer UID {0} removed from BTM**".format(uid))
                 else:
                     log = '{0}: unrecognized CBT message {1} received from {2}.Data:: {3}' \
                         .format(cbt.recipient, cbt.action, cbt.initiator, cbt.data)
@@ -309,9 +292,10 @@ class BaseTopologyManager(ControllerModule,CFX):
                 if msg_type == "offline_peer":
                     if msg["uid"] in interface_details["discovered_nodes"]:
                         interface_details["discovered_nodes"].remove(msg["uid"])
-                    log = "removed peer from discovered node list {0}".format(msg["uid"])
+                    log = "Removed peer from discovered node list {0}".format(msg["uid"])
                     self.registerCBT('Logger', 'debug', log)
-
+                    self.registerCBT("ConnectionManager", "REMOVE_CONNECTION", {"uid": msg["uid"], "interface_name":
+                        interface_name })
                 else:
                     log = '{0}: unrecognized CBT message {1} received from {2}.Data:: {3}' \
                         .format(cbt.recipient, cbt.action, cbt.initiator, cbt.data)
@@ -329,11 +313,9 @@ class BaseTopologyManager(ControllerModule,CFX):
                     interface_details["mac_uid_table"][msg["mac"]] = msg["_uid"]
                     if msg["_uid"] not in interface_details["uid_mac_table"].keys():
                         interface_details["uid_mac_table"][msg["_uid"]] = [msg["mac"]]
-                    # Send MAC Address to NodeDiscovery module
-                    self.registerCBT("NodeDiscovery", "getlocalmacaddress",
-                                     {"interface_name": interface_name, "localmac": msg["mac"]})
-                    self.registerCBT("Logger", "info", "Local Node Info UID:{0} MAC:{1} IP4: {2}".format(msg["_uid"], msg["mac"],
-                                    msg["_ip4"]))
+                    self.registerCBT("Logger", "info", "Local Node Info UID:{0} MAC:{1} IP4: {2}".format(msg["_uid"],
+                                                                                                         msg["mac"],
+                                                                                                         msg["_ip4"]))
                 # update peer list
                 elif msg_type == "peer_state":
                     uid = msg["uid"]
@@ -374,10 +356,10 @@ class BaseTopologyManager(ControllerModule,CFX):
                                 del interface_details["uid_mac_table"][uid]
                             return
 
-                        # update peer state
-                        #interface_details[conn_type][uid].update(msg)
+                        # update peer state within BTM Tables
                         interface_details[conn_type][uid]["ttl"] = ttl
                         interface_details[conn_type][uid]["status"] = msg["status"]
+                        # Send connection details to Conn Manager
                         message = {
                             "uid": msg["uid"],
                             "stats": msg["stats"],
@@ -385,7 +367,7 @@ class BaseTopologyManager(ControllerModule,CFX):
                             "mac": msg["mac"],
                             "interface_name": interface_name
                         }
-                        self.registerCBT("ConnectionManager","update_connection",message)
+                        self.registerCBT("ConnectionManager", "UPDATE_CONNECTION", message)
                 elif msg_type == "UpdateMACUIDIp":
                     location = msg.get("location")
                     uid = msg["uid"]
@@ -497,8 +479,8 @@ class BaseTopologyManager(ControllerModule,CFX):
             for interface_name in self.ipop_interface_details.keys():
                 interface_details = self.ipop_interface_details[interface_name]
                 local_uid = interface_details["ipop_state"]["_uid"]
-                local_ip  = interface_details["ipop_state"]["_ip4"]
-                unmanaged_node_list,successors, chords, on_demands = [], [], [],[]
+                local_ip = interface_details["ipop_state"]["_ip4"]
+                unmanaged_node_list, successors, chords, on_demands = [], [], [], []
 
                 # Iterate over the IP-UID Table to retrieve Unmanaged node IP list
                 for ip, uid in list(interface_details["ip_uid_table"].items()):
@@ -520,8 +502,6 @@ class BaseTopologyManager(ControllerModule,CFX):
                     if "status" in interface_details["on_demand"][ondemand].keys():
                         if interface_details["on_demand"][ondemand]["status"] == "online":
                             on_demands.append(ondemand)
-
-
                 # Check if GEO IP exists else invoke the function to retrieve the details from Public Stun server
                 if interface_details["GeoIP"] in ["", None]:
                     geoip = self.getGeoIP()
@@ -564,15 +544,14 @@ class BaseTopologyManager(ControllerModule,CFX):
                     srcmacindex = 44 + 2 * maclen
                     srcmac = data[44:srcmacindex]
                     srcipindex = srcmacindex + 2 * iplen
-                    srcip = '.'.join(
-                        str(int(i, 16)) for i in [data[srcmacindex:srcipindex][i:i + 2] for i in range(0, 8, 2)])
+                    # srcip = '.'.join(str(int(i, 16)) for i in [data[srcmacindex:srcipindex][i:i + 2] for i in range(0, 8, 2)])
                     destmacindex = srcipindex + 2 * maclen
                     destmac = data[srcipindex:destmacindex]
                     destipindex = destmacindex + 2 * iplen
                     dst_ip = '.'.join(
                         str(int(i, 16)) for i in [data[destmacindex:destipindex][i:i + 2] for i in range(0, 8, 2)])
                 else:
-                    src_ip = '.'.join(str(int(i, 16)) for i in [data[52:60][i:i + 2] for i in range(0, 8, 2)])
+                    # src_ip = '.'.join(str(int(i, 16)) for i in [data[52:60][i:i + 2] for i in range(0, 8, 2)])
                     dst_ip = '.'.join(str(int(i, 16)) for i in [data[60:68][i:i + 2] for i in range(0, 8, 2)])
                     destmac, srcmac = data[0:12], data[12:24]
 
@@ -620,23 +599,20 @@ class BaseTopologyManager(ControllerModule,CFX):
                     "dst_uid": dst_uid,
                     "datagram": data
                 }
-
                 if dst_uid not in list(interface_details["peer_uid_sendmsgcount"].keys()):
                     interface_details["peer_uid_sendmsgcount"][dst_uid] = {"count": 1}
                 else:
                     interface_details["peer_uid_sendmsgcount"][dst_uid]["count"] += 1
 
-                    if interface_details["peer_uid_sendmsgcount"][dst_uid]["count"] > self.CMConfig[
-                        "OndemandThreshold"]:
+                    if interface_details["peer_uid_sendmsgcount"][dst_uid]["count"] > self.CMConfig["OndemandThreshold"]:
                         if dst_uid in interface_details["online_peer_uid"]:
                             interface_details["peer_uid_sendmsgcount"][dst_uid] = {"count": 0}
                         elif "conn_init_time" not in list(interface_details["peer_uid_sendmsgcount"][dst_uid].keys()):
                             interface_details["peer_uid_sendmsgcount"][dst_uid]["conn_init_time"] = time.time()
                             # add on-demand link
-                            self.add_outbound_link("on_demand",dst_uid, interface_name)
+                            self.add_outbound_link("on_demand", dst_uid, interface_name)
                         elif time.time() - interface_details["peer_uid_sendmsgcount"][dst_uid]["conn_init_time"] \
-                                > self.CMConfig["OndemandThreshold"] and dst_uid not in interface_details[
-                            "online_peer_uid"]:
+                                > self.CMConfig["OndemandThreshold"] and dst_uid not in interface_details["online_peer_uid"]:
                             interface_details["peer_uid_sendmsgcount"][dst_uid]["conn_init_time"] = time.time()
                             # add on-demand link
                             self.add_outbound_link("on_demand", dst_uid, interface_name)
@@ -656,7 +632,7 @@ class BaseTopologyManager(ControllerModule,CFX):
 ############################################################################
 
     # closer function
-    #   tests if uid is successively closer to uid_B than uid_A
+    # tests if uid is successively closer to uid_B than uid_A
     def closer(self, uid_A, uid, uid_B):
         if (uid_A < uid_B) and ((uid_A < uid) and (uid <= uid_B)):
             return True  # 0---A===B---N
@@ -674,12 +650,12 @@ class BaseTopologyManager(ControllerModule,CFX):
     #   - msg      = message in transit
     #   returns true if this packet is intended for the calling node
 
-    def forward_msg(self,fwd_type, dst_uid, msg, interface_name):
+    def forward_msg(self, fwd_type, dst_uid, msg, interface_name):
         # find peer that is successively closest to and less-than-or-equal-to the designated UID
         interface_details = self.ipop_interface_details[interface_name]
         uid = interface_details["ipop_state"]["_uid"]
         nxt_uid = uid
-        online_peer_list = list(interface_details["successor"].keys())+list(interface_details["chord"].keys())+ \
+        online_peer_list = list(interface_details["successor"].keys())+list(interface_details["chord"].keys()) +\
                            list(interface_details["on_demand"].keys())
         for peer in sorted(online_peer_list):
             if self.linked(peer, interface_name):
@@ -709,8 +685,8 @@ class BaseTopologyManager(ControllerModule,CFX):
                 return True
 
                 # there is a closer node; forward packet to the next node
-        self.registerCBT("ConnectionManager","SendICCMessage",{"dst_uid":nxt_uid, "msg":msg, "interface_name":interface_name})
-        #self.send_msg_icc(nxt_uid, msg, interface_name)
+        self.registerCBT("ConnectionManager", "SEND_ICC_MSG",
+                         {"dst_uid": nxt_uid, "msg": msg, "interface_name": interface_name})
         return False
 
     def linked(self, uid, interface_name):
@@ -728,12 +704,12 @@ class BaseTopologyManager(ControllerModule,CFX):
                     return True
         return False
 ############################################################################
-                    # manage topology #
+    # manage topology #
 ############################################################################
 
     def manage_topology(self, interface_name):
-        log = "Inside Manager Topology"
-        self.registerCBT('Logger', 'info', log)
+        log = "Inside Topology Manager "
+        self.registerCBT('Logger', 'debug', log)
         interface_details = self.ipop_interface_details[interface_name]
 
         online_peer_list = list(interface_details["successor"].keys()) + list(interface_details["chord"].keys()) + \
@@ -758,17 +734,11 @@ class BaseTopologyManager(ControllerModule,CFX):
 
         # connecting to the peer-to-peer network
         if interface_details["p2p_state"] == "connecting":
-            self.registerCBT('Logger', 'info', "discovered nodes: {0}".\
-                             format(interface_details["discovered_nodes"]))
+            self.registerCBT('Logger', 'debug', "discovered nodes: {0}".format(interface_details["discovered_nodes"]))
             self.registerCBT('Logger', 'info', interface_name + " p2p state: connecting")
+            self.add_successors(interface_name)
 
-            # attempt to bootstrap
-            try:
-                self.add_successors(interface_name)
-            except:
-                self.registerCBT('Logger', 'error', "Exception in add_successors")
-
-            # wait until atleast one successor or on-demand link is created
+            # wait until atleast one successor, chord or on-demand links are created
             for peer in sorted(online_peer_list):
                 if self.linked(peer, interface_name):
                     interface_details["p2p_state"] = "connected"
@@ -794,12 +764,9 @@ class BaseTopologyManager(ControllerModule,CFX):
     def timer_method(self):
         try:
             for interface_name in self.ipop_interface_details.keys():
-                if self.ipop_interface_details[interface_name]["UpdateXMPPPeerFlag"] == True:
-                    self.registerCBT(self.ipop_interface_details[interface_name]["xmpp_client_code"], \
-                                     "GetXMPPPeer", {"interface_name":interface_name})
-                #self.registerCBT("Logger","debug","BTM Table::"+str(self.ipop_interface_details[interface_name]))
+                # self.registerCBT("Logger","debug","BTM Table::"+str(self.ipop_interface_details[interface_name]))
                 self.manage_topology(interface_name)
-                for linktype in ["successor","chord","on_demand"]:
+                for linktype in ["successor", "chord", "on_demand"]:
                     for uid in self.ipop_interface_details[interface_name][linktype].keys():
                         message = {
                                     "interface_name": interface_name,
@@ -811,7 +778,7 @@ class BaseTopologyManager(ControllerModule,CFX):
 
                 # periodically call policy for link removal
                 self.clean_chord(interface_name)
-                #self.clean_on_demand(interface_name)  TO DO
+                # self.clean_on_demand(interface_name)  TO DO
 
         except Exception as err:
             self.registerCBT('Logger', 'error', "Exception in BTM timer:" + str(err))

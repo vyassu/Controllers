@@ -22,9 +22,9 @@ class Logger(ControllerModule):
                 filepath = self.CMConfig["LogFilePath"]
             else:
                 filepath = "./"
-            filepath+=self.CMConfig["LogFileName"]
-            handler = lh.RotatingFileHandler(filename=filepath,maxBytes=self.CMConfig["LogFileSize"],\
-                                   backupCount=self.CMConfig["BackupLogFileCount"])
+            filepath += self.CMConfig["LogFileName"]
+            handler = lh.RotatingFileHandler(filename=filepath, maxBytes=self.CMConfig["LogFileSize"],
+                                             backupCount=self.CMConfig["BackupLogFileCount"])
             self.logger.addHandler(handler)
         else:
 

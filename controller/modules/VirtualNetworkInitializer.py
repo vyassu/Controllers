@@ -3,6 +3,7 @@ import controller.framework.ipoplib as ipoplib
 import controller.framework.fxlib as fxlib
 import socket
 
+
 class VirtualNetworkInitializer(ControllerModule):
     def __init__(self, CFxHandle, paramDict, ModuleName):
         super(VirtualNetworkInitializer, self).__init__(CFxHandle, paramDict, ModuleName)
@@ -10,17 +11,16 @@ class VirtualNetworkInitializer(ControllerModule):
         self.CONFIG = paramDict
         self.vnetdetails = paramDict["Vnets"]
         # Query VPN Type from CFX Module
-        self.vpn_type = self.CFxHandle.queryParam('CFx','Model')
+        self.vpn_type = self.CFxHandle.queryParam('CFx', 'Model')
 
     def initialize(self):
-
         # Create connection to Tincan
-        self.registerCBT("Logger","info","Creating Tincan inter-process link")
+        self.registerCBT("Logger", "info", "Creating Tincan inter-process link")
         ep = ipoplib.ENDPT
-        if socket.has_ipv6 == False:
+        if socket.has_ipv6 is False:
             ep["IPOP"]["Request"]["AddressFamily"] = "af_inet"
-            ep["IPOP"]["Request"]["IP"] = self.CFxHandle.queryParam("TincanInterface","localhost")
-        self.registerCBT("TincanInterface","DO_SEND_TINCAN_MSG",ep)
+            ep["IPOP"]["Request"]["IP"] = self.CFxHandle.queryParam("TincanInterface", "localhost")
+        self.registerCBT("TincanInterface", "DO_SEND_TINCAN_MSG", ep)
 
         # Set Tincan LogLevel
         self.registerCBT("Logger", "info", "Setting Tincan log level to " + self.CONFIG["Log"]["Level"])
@@ -45,14 +45,14 @@ class VirtualNetworkInitializer(ControllerModule):
         for i in range(len(self.vnetdetails)):
             vn = ipoplib.VNET
             if self.vpn_type == 'GroupVPN':
-                ip4 = self.CFxHandle.queryParam('DHCP','IP4')
-                if ip4 == None:
+                ip4 = self.CFxHandle.queryParam('DHCP', 'IP4')
+                if ip4 is None:
                     ip4 = self.vnetdetails[i]["IP4"]
                 self.vnetdetails[i]["uid"] = fxlib.gen_uid(ip4)
                 self.vnetdetails[i]["ip6"] = fxlib.gen_ip6(self.vnetdetails[i]["uid"])
             elif self.vpn_type == 'SocialVPN':
                 self.vnetdetails[i]["IP4"] = self.CONFIG['AddressMapper']["ip4"]
-                self.vnetdetails[i]["uid"] = self.CFxHandle.queryParam('CFx','local_uid')
+                self.vnetdetails[i]["uid"] = self.CFxHandle.queryParam('CFx', 'local_uid')
                 self.vnetdetails[i]["ip6"] = fxlib.gen_ip6(self.vnetdetails[i]["uid"])
 
             # Create VNET Request Message
@@ -63,7 +63,8 @@ class VirtualNetworkInitializer(ControllerModule):
 
             vn["IPOP"]["Request"]["InterfaceName"] = self.vnetdetails[i]["TapName"]
             vn["IPOP"]["Request"]["Description"] = self.vnetdetails[i]["Description"]
-            vn["IPOP"]["Request"]["StunAddress"] = self.CONFIG["Stun"][0]  # Currently configured to take the first stun address
+            # Currently configured to take the first stun address
+            vn["IPOP"]["Request"]["StunAddress"] = self.CONFIG["Stun"][0]
             vn["IPOP"]["Request"]["TurnAddress"] = self.CONFIG["Turn"][0]["Address"]
             vn["IPOP"]["Request"]["TurnUser"] = self.CONFIG["Turn"][0]["User"]
             vn["IPOP"]["Request"]["TurnPass"] = self.CONFIG["Turn"][0]["Password"]
@@ -102,19 +103,20 @@ class VirtualNetworkInitializer(ControllerModule):
                 vn["IPOP"]["Request"]["IPMappingEnabled"] = True
 
             # Send VNET creation request to Tincan
-            self.registerCBT("TincanInterface", "DO_SEND_TINCAN_MSG",vn)
+            self.registerCBT("TincanInterface", "DO_SEND_TINCAN_MSG", vn)
 
-            self.registerCBT("Logger", "info", "Ignoring interfaces {0}".format(self.vnetdetails[i]["IgnoredNetInterfaces"]))
+            self.registerCBT("Logger", "info", "Ignoring interfaces {0}".
+                             format(self.vnetdetails[i]["IgnoredNetInterfaces"]))
             if "IgnoredNetInterfaces" in self.vnetdetails[i]:
                 net_ignore_list = ipoplib.IGNORE
                 net_ignore_list["IPOP"]["Request"]["IgnoredNetInterfaces"] = self.vnetdetails[i]["IgnoredNetInterfaces"]
                 net_ignore_list["IPOP"]["Request"]["InterfaceName"] = self.vnetdetails[i]["TapName"]
                 # Network Interfaces that have to be ignored while NAT traversal
-                self.registerCBT("TincanInterface", "DO_SEND_TINCAN_MSG",net_ignore_list)
+                self.registerCBT("TincanInterface", "DO_SEND_TINCAN_MSG", net_ignore_list)
 
         self.registerCBT("Logger", "info", "Virtual Network Initialized")
 
-    def processCBT(self):
+    def processCBT(self, cbt):
         pass
 
     def timer_method(self):

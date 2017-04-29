@@ -1,10 +1,9 @@
 #!/usr/bin/env python
 import hashlib
-import json,socket
-import logging
-ipopVerMjr = "16";
-ipopVerMnr = "01";
-ipopVerRev = "0";
+import socket
+ipopVerMjr = "16"
+ipopVerMnr = "01"
+ipopVerRev = "0"
 ipopVerRel = "{0}.{1}.{2}".format(ipopVerMjr, ipopVerMnr, ipopVerRev)
 
 # set default config values
@@ -13,15 +12,15 @@ CONFIG = {
         "local_uid": "",
         "uid_size": 40,
         "router_mode": False,
-        "ipopVerRel" : ipopVerRel,
+        "ipopVerRel": ipopVerRel,
     },
-    "VirtualNetworkInitializer":{
+    "VirtualNetworkInitializer": {
         "Enabled": True,
         "MTU4": 1200,
         "MTU6": 1200,
         "LocalPrefix6": 64,
         "LocalPrefix4": 16,
-        "dependencies": [ "Logger", "TincanInterface" ]
+        "dependencies": ["Logger", "TincanInterface"]
     },
     "TincanInterface": {
         "buf_size": 65507,
@@ -35,19 +34,23 @@ CONFIG = {
     },
     "BroadCastForwarder": {
         "Enabled": True,
-        "dependencies": [ "Logger","VirtualNetworkInitializer","TincanInterface" ]
+        "dependencies": ["Logger", "VirtualNetworkInitializer", "TincanInterface"]
     },
     "NodeDiscovery": {
         "Enabled": True,
-        "dependencies": [ "Logger","VirtualNetworkInitializer","TincanInterface" ]
+        "dependencies": ["Logger", "VirtualNetworkInitializer", "TincanInterface", "ConnectionManager"]
     },
     "IPMulticast": {
         "Enabled": True,
-        "dependencies": [ "Logger","VirtualNetworkInitializer","TincanInterface" ]
+        "dependencies": ["Logger", "VirtualNetworkInitializer", "TincanInterface"]
     },
     "XmppClient": {
         "Enabled": True,
-        "dependencies": [ "Logger","VirtualNetworkInitializer","TincanInterface" ]
+        "MessagePerIntervalDelay": 10,
+        "InitialAdvertismentDelay": 5,
+        "XmppAdvrtDelay": 5,
+        "MaxAdvertismentDelay": 30,
+        "dependencies": ["Logger", "VirtualNetworkInitializer", "TincanInterface"]
     },
     "ConnectionManager": {
         "Enabled": True,
@@ -57,7 +60,7 @@ CONFIG = {
         "LinkPulse": 180,
         "OndemandLinkRateThreshold": 128,
         "MaxConnRetry": 5,
-        "dependencies": [ "Logger","VirtualNetworkInitializer","TincanInterface","BaseTopologyManager" ]
+        "dependencies": ["Logger", "VirtualNetworkInitializer", "TincanInterface", "BaseTopologyManager"]
     },
     "BaseTopologyManager": {
         "Enabled": True,
@@ -69,12 +72,12 @@ CONFIG = {
         "LinkPulse": 180,
         "OnDemandLinkTTL": 60,
         "TimerInterval": 15,
-        "OndemandThreshold":1000,
+        "OndemandThreshold": 1000,
         "OndemandConnectionWaitTime": 15,
         "NumberOfPingsToPeer": 5,
         "PeerPingInterval": 300,
         "MaxConnRetry": 5,
-        "dependencies": [ "Logger","VirtualNetworkInitializer","TincanInterface" ]
+        "dependencies": ["Logger", "VirtualNetworkInitializer", "TincanInterface", "XmppClient"]
     },
     "OverlayVisualizer": {
         "Enabled": False,
@@ -83,9 +86,10 @@ CONFIG = {
         "WebServiceDataPostInterval": 5,
         "TimerInterval": 5,
         "NodeName": "",
-        "dependencies": [ "Logger" ]
+        "dependencies": ["Logger"]
     }
 }
+
 
 def gen_ip6(uid, ip6=None):
     if ip6 is None:
@@ -94,8 +98,10 @@ def gen_ip6(uid, ip6=None):
         ip6 += ":" + uid[i:i+4]
     return ip6
 
+
 def gen_uid(ip4):
     return hashlib.sha1(ip4.encode('utf-8')).hexdigest()[:CONFIG["CFx"]["uid_size"]]
+
 
 def send_msg(sock, msg):
     if socket.has_ipv6:
@@ -104,4 +110,4 @@ def send_msg(sock, msg):
     else:
         dest = (CONFIG["TincanInterface"]["localhost"],
                 CONFIG["TincanInterface"]["svpn_port"])
-    return sock.sendto(bytes((msg).encode('utf-8')),dest)
+    return sock.sendto(bytes(msg.encode('utf-8')), dest)

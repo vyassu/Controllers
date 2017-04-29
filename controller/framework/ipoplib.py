@@ -5,7 +5,7 @@ py_ver = sys.version_info[0]
 ENDPT = {
     "IPOP": {
         "ProtocolVersion": 4,
-        "TransactionId" : 0,
+        "TransactionId": 0,
         "ControlType": "TincanRequest",
         "Request": {
             "Command": "CreateCtrlRespLink",
@@ -19,41 +19,41 @@ ENDPT = {
 LOGCFG = {
     "IPOP": {
         "ProtocolVersion": 4,
-        "TransactionId" : 0,
+        "TransactionId": 0,
         "ControlType": "TincanRequest",
         "Request": {
-          "Command" : "ConfigureLogging",
-          "Level" : "WARNING",
-          "Device" : "FILE",
-          "Directory" : "./logs/",
-          "Filename" : "tincan_log",
-          "MaxArchives" : 10,
-          "MaxFileSize" : 1048576,
-          "ConsoleLevel" : "ERROR"
+          "Command": "ConfigureLogging",
+          "Level": "WARNING",
+          "Device": "FILE",
+          "Directory": "./logs/",
+          "Filename": "tincan_log",
+          "MaxArchives": 10,
+          "MaxFileSize": 1048576,
+          "ConsoleLevel": "ERROR"
         }
     }
 }
 LSTATE = {
     "IPOP": {
         "ProtocolVersion": 4,
-        "TransactionId" : 0,
+        "TransactionId": 0,
         "ControlType": "TincanRequest",
         "Request": {
           "Command": "QueryNodeInfo",
           "InterfaceName": "ipop_tap0",
-          "MAC" : ""
+          "MAC": ""
         }
     }
 }
 ECHO = {
   "IPOP": {
       "ProtocolVersion": 4,
-      "TransactionId" : 0,
+      "TransactionId": 0,
       "ControlType": "TincanRequest",
       "Request": {
         "Command": "Echo",
         "InterfaceName": "ipop_tap0",
-        "Message" : "echo message"
+        "Message": "echo message"
       }
   }
 }
@@ -61,42 +61,42 @@ VNET = {
     "IPOP": {
         "ProtocolVersion": 4,
         "ControlType": "TincanRequest",
-        "TransactionId" : 0,
+        "TransactionId": 0,
         "Request": {
-          "Command" : "CreateVnet",
-          "InterfaceName" : "ipop_tap0",
-          "Description" : "My Devices",
-          "LocalVirtIP4" : "",
-          "LocalPrefix4" : "",
-          "LocalPrefix6" : "",
-          "MTU4" : "",
-          "MTU6" : "",
-          "LocalUID" : "",
-          "LocalVirtIP6" : "",
+          "Command": "CreateVnet",
+          "InterfaceName": "ipop_tap0",
+          "Description": "My Devices",
+          "LocalVirtIP4": "",
+          "LocalPrefix4": "",
+          "LocalPrefix6": "",
+          "MTU4": "",
+          "MTU6": "",
+          "LocalUID": "",
+          "LocalVirtIP6": "",
           "StunAddress": "",
-          "TurnAddress" : "",
-          "TurnUser" : "",
-          "TurnPass" : "",
-          "L2TunnelEnabled" : True,
-          "AutoTrimEnabled" : False,
-          "IPMappingEnabled" : False
+          "TurnAddress": "",
+          "TurnUser": "",
+          "TurnPass": "",
+          "L2TunnelEnabled": True,
+          "AutoTrimEnabled": False,
+          "IPMappingEnabled": False
         }
     }
 }
 LCAS = {
     "IPOP": {
         "ProtocolVersion": 4,
-        "TransactionId" : 100005,
+        "TransactionId": 100005,
         "ControlType": "TincanRequest",
         "Request": {
-          "Command" : "CreateLinkListener",
-          "InterfaceName" : "ipop_tap0",
-          "EncryptionEnabled" : True,
-          "PeerInfo" : {
-            "VIP4" : "",
-            "UID" : "",
-            "MAC" : "",
-            "Fingerprint" : ""
+          "Command": "CreateLinkListener",
+          "InterfaceName": "ipop_tap0",
+          "EncryptionEnabled": True,
+          "PeerInfo": {
+            "VIP4": "",
+            "UID": "",
+            "MAC": "",
+            "Fingerprint": ""
           }
         }
     }
@@ -104,17 +104,17 @@ LCAS = {
 CONCT = {
     "IPOP": {
         "ProtocolVersion": 4,
-        "TransactionId" : 100006,
+        "TransactionId": 100006,
         "ControlType": "TincanRequest",
         "Request": {
-          "Command" : "ConnectToPeer",
-          "InterfaceName" : "ipop_tap0",
-          "EncryptionEnabled" : True,
-          "PeerInfo" : {
-            "VIP4" : "",
-            "UID" : "",
-            "MAC" : "",
-            "Fingerprint" : ""
+          "Command": "ConnectToPeer",
+          "InterfaceName": "ipop_tap0",
+          "EncryptionEnabled": True,
+          "PeerInfo": {
+            "VIP4": "",
+            "UID": "",
+            "MAC": "",
+            "Fingerprint": ""
           }
         }
     }
@@ -122,104 +122,105 @@ CONCT = {
 IGNORE = {
     "IPOP": {
         "ProtocolVersion": 4,
-        "TransactionId" : 100007,
+        "TransactionId": 100007,
         "ControlType": "TincanRequest",
         "Request": {
-          "Command" : "SetIgnoredNetInterfaces",
-          "InterfaceName" : "ipop_tap0",
-          "IgnoredNetInterfaces" : []
+          "Command": "SetIgnoredNetInterfaces",
+          "InterfaceName": "ipop_tap0",
+          "IgnoredNetInterfaces": []
         }
     }    
 }
 ICC = {
     "IPOP": {
       "ProtocolVersion": 4,
-      "Tag" : 100020,
+      "Tag": 100020,
       "ControlType": "TincanRequest",
-      "Request" : {
-        "Command" : "ICC",
+      "Request": {
+        "Command": "ICC",
         "RecipientMac": "",
-        "InterfaceName" : "ipop_tap0",
-        "Recipient" : "peer_uid",
-        "Data" : "encoded string"
+        "InterfaceName": "ipop_tap0",
+        "Recipient": "peer_uid",
+        "Data": "encoded string"
       }
      }
   }
 PACKET = {
     "IPOP": {
         "ProtocolVersion": 4,
-        "TransactionId" : 100030,
+        "TransactionId": 100030,
         "ControlType": "TincanRequest",
         "Request": {
-            "Command" : "UpdateRoutes",
-            "InterfaceName" : "ipop_tap0",
-            "Data" : "encoded_string"
+            "Command": "UpdateRoutes",
+            "InterfaceName": "ipop_tap0",
+            "Data": "encoded_string"
         }
      }
   }
 INSERT_TAP_PACKET = {
     "IPOP": {
         "ProtocolVersion": 4,
-        "TransactionId" : 100030,
+        "TransactionId": 100030,
         "ControlType": "TincanRequest",
         "Request": {
-            "Command" : "InjectFrame",
-            "InterfaceName" : "ipop_tap0",
-            "Data" : "encoded_string"
+            "Command": "InjectFrame",
+            "InterfaceName": "ipop_tap0",
+            "Data": "encoded_string"
         }
      }
   }
 REMOVE = {
     "IPOP": {
-        "ProtocolVersion" : 4,
-        "TransactionId" : 100015,
+        "ProtocolVersion": 4,
+        "TransactionId": 100015,
         "ControlType": "TincanRequest",
         "Request": {
-            "Command" : "RemovePeer",
-            "InterfaceName" : "ipop_tap0",
-            "MAC" : ""
+            "Command": "RemovePeer",
+            "InterfaceName": "ipop_tap0",
+            "MAC": ""
         }
      }
   }
 RESP = {
     "IPOP": {
         "ProtocolVersion": 4,
-        "TransactionId" : 100000,
+        "TransactionId": 100000,
         "ControlType": "TincanResponse",
         "Request": {
         },
-        "Response" : {
-            "Success" : True,
-            "Message" : "description"
+        "Response": {
+            "Success": True,
+            "Message": "description"
         }
     }
 }
 
 ADD_ROUTING = {
         "IPOP": {
-        "ProtocolVersion": 4,
-        "TransactionId" : 102001,
-        "ControlType": "TincanRequest",
-        "Request": {
-            "Command": "UpdateMap",
-            "InterfaceName" : "ipop_tap0",
-            "Routes" : []
-            }
+            "ProtocolVersion": 4,
+            "TransactionId": 102001,
+            "ControlType": "TincanRequest",
+            "Request": {
+                "Command": "UpdateMap",
+                "InterfaceName": "ipop_tap0",
+                "Routes": []
+                }
         }
 }
 
 DELETE_ROUTING = {
         "IPOP": {
-        "ProtocolVersion": 4,
-        "TransactionId" : 102001,
-        "ControlType": "TincanRequest",
-        "Request": {
-            "Command": "RemoveRoutes",
-            "InterfaceName" : "ipop_tap0",
-            "Routes" : []
-            }
-    }
+            "ProtocolVersion": 4,
+            "TransactionId": 102001,
+            "ControlType": "TincanRequest",
+            "Request": {
+                "Command": "RemoveRoutes",
+                "InterfaceName": "ipop_tap0",
+                "Routes": []
+                }
+        }
 }
+
 
 def ip6_a2b(str_ip6):
     if py_ver == 3:
@@ -260,11 +261,13 @@ def mac_b2a(bin_mac):
     else:
         return ''.join(bin_mac[x].encode("hex") + ":" for x in range(0, 6))[:-1]
 
+
 def uid_a2b(str_uid):
     if py_ver == 3:
         return int(str_uid, 16).to_bytes(20, byteorder='big')
     else:
         return str_uid.decode("hex")
+
 
 def uid_b2a(bin_uid):
     if py_ver == 3:
@@ -272,11 +275,13 @@ def uid_b2a(bin_uid):
     else:
         return bin_uid.encode("hex")
 
+
 def hexstr2b(hexstr):
     if py_ver == 3:
         return b''.join(int(hexstr[i:i+2], 16).to_bytes(1, byteorder='big') for i in range(0, len(hexstr), 2))
     else:
         return hexstr.decode('hex')
+
 
 def b2hexstr(binary):
     if py_ver == 3:
@@ -284,12 +289,12 @@ def b2hexstr(binary):
     else:
         return binary.encode('hex')
 
+
 def gen_ip4(uid, peer_map, ip4):
     try:
         return peer_map[uid]
-    except KeyError:
-        pass
-
+    except KeyError as error:
+        print("Exception Caught in ipoplib: {0}".format(str(error)))
     ips = set(peer_map.values())
     prefix, _ = ip4.rsplit(".", 1)
     # we allocate *.101 - *254 ensuring a 3-digit suffix and avoiding the
@@ -300,4 +305,3 @@ def gen_ip4(uid, peer_map, ip4):
             return peer_map[uid]
     del peer_map[uid]
     raise OverflowError("too many peers, out of IPv4 addresses")
-
