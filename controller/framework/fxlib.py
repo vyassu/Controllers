@@ -32,8 +32,17 @@ CONFIG = {
         "localhost6": "::1",
         "dependencies": ["Logger"]
     },
+    "LinkManager": {
+        "Enabled": True,
+        "TimerInterval": 10,                # Timer thread interval in sec
+        "InitialLinkTTL": 120,              # Initial Time to Live for a p2p link in sec
+        "LinkPulse": 180,                   # Time to Live for an online p2p link in sec
+        "MaxConnRetry": 5,                  # Max Connection Retry attempts for each p2p link
+        "dependencies": ["Logger", "VirtualNetworkInitializer", "TincanInterface", "BaseTopologyManager"]
+    },
     "BroadCastForwarder": {
         "Enabled": True,
+        "TimerInterval": 5,                # Timer thread interval in sec
         "dependencies": ["Logger", "VirtualNetworkInitializer", "TincanInterface"]
     },
     "UnmanagedNodeDiscovery": {
@@ -51,14 +60,6 @@ CONFIG = {
         "XmppAdvrtDelay": 5,                # Incremental delay for XMPP messages
         "MaxAdvertismentDelay": 30,         # Max XMPP Message delay
         "dependencies": ["Logger", "VirtualNetworkInitializer", "TincanInterface"]
-    },
-    "LinkManager": {
-        "Enabled": True,
-        "TimerInterval": 10,                # Timer thread interval in sec
-        "InitialLinkTTL": 120,              # Initial Time to Live for a p2p link in sec
-        "LinkPulse": 180,                   # Time to Live for an online p2p link in sec
-        "MaxConnRetry": 5,                  # Max Connection Retry attempts for each p2p link
-        "dependencies": ["Logger", "VirtualNetworkInitializer", "TincanInterface", "BaseTopologyManager"]
     },
     "BaseTopologyManager": {
         "Enabled": True,

@@ -157,4 +157,8 @@ class BroadCastForwarder(ControllerModule):
         pass
 
     def timer_method(self):
+        # Refresh the Online Peer list on every timer thread invocation
+        for interface_name in self.ipop_interface_details.keys():
+            self.registerCBT('LinkManager', 'TINCAN_CONTROL', {"interface_name": interface_name,
+                                                               "type": "get_online_peerlist"})
         pass

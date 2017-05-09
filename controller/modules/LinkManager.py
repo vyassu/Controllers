@@ -341,7 +341,7 @@ class LinkManager(ControllerModule):
                     "status": linkdetails["status"],
                     "mac": linkdetails["mac"]
                 }})
-                self.registerCBT(cbt.initiator, "RETRIEVE_LINK_DETAILS", {"interface_name": interface_name,
+            self.registerCBT(cbt.initiator, "RETRIEVE_LINK_DETAILS", {"interface_name": interface_name,
                                                                           "data": message})
         elif cbt.action == "TINCAN_CONTROL":
             msg = cbt.data

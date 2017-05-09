@@ -501,7 +501,7 @@ class BaseTopologyManager(ControllerModule, CFX):
                 elif destmac in interface_details["mac_uid_table"].keys():
                     dst_uid = interface_details["mac_uid_table"][destmac]
                 elif dst_ip.split(".")[0] >= "224" or destmac[0:6] == "01005E":
-                    self.registerCBT("IPMulticast", "datapacket",
+                    self.registerCBT("IPMulticast", "multicast",
                                      {"dataframe": data, "interface_name": interface_name, "type": "local"})
                     return
                 elif destmac == "FFFFFFFFFFFF":
