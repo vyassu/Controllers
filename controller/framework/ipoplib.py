@@ -195,7 +195,7 @@ RESP = {
     }
 }
 
-ADD_ROUTING = {
+ADD_FORWARDING_RULE = {
         "IPOP": {
             "ProtocolVersion": 4,
             "TransactionId": 102001,
@@ -208,7 +208,7 @@ ADD_ROUTING = {
         }
 }
 
-DELETE_ROUTING = {
+DELETE_FORWARDING_RULE = {
         "IPOP": {
             "ProtocolVersion": 4,
             "TransactionId": 102001,
@@ -220,6 +220,10 @@ DELETE_ROUTING = {
                 }
         }
 }
+
+
+def ip4_a2hex(ipstr):
+    return "".join(hex(int(x, 10))[2:] for x in ipstr.split("."))
 
 
 def ip6_a2b(str_ip6):
@@ -305,3 +309,36 @@ def gen_ip4(uid, peer_map, ip4):
             return peer_map[uid]
     del peer_map[uid]
     raise OverflowError("too many peers, out of IPv4 addresses")
+
+
+# Function to add 2 hex data and return the result
+def addhex(data1, data2):
+    bindata1 = list(("{0:0" + str((len(data1)) * 4) + "b}").format(int(data1, 16)))
+    bindata2 = list(("{0:0" + str((len(data2)) * 4) + "b}").format(int(data2, 16)))
+    if len(bindata1) == len(bindata2):
+        j = len(bindata1) - 1
+    elif len(bindata1) > len(bindata2):
+        j = len(bindata1) - 1
+        bindata2 = [0] * (len(bindata1) - len(bindata2)) + bindata2
+    else:
+        j = len(bindata2) - 1
+        bindata1 = [0] * (len(bindata2) - len(bindata1)) + bindata1
+
+    carry = 0
+    result = []
+    while j > 0:
+        summer = carry + int(bindata1[j]) + int(bindata2[j])
+        result.insert(0, str(summer % 2))
+        carry = summer / 2
+        j -= 1
+    return hex(int("".join(result), 2))
+
+
+# Function to calculate checksum and return it in HEX format
+def getchecksum(hexstr):
+    result = "0000"
+    for i in range(0, len(hexstr), 4):
+        result = addhex(result, hexstr[i:i + 4])
+    if len(result) != 4:
+        result = addhex(result[0:len(result) - 4], result[len(result) - 4:])
+    return hex(65535 ^ int(result, 16))

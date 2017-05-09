@@ -7,18 +7,23 @@ from threading import Thread
 class TincanInterface(ControllerModule):
     def __init__(self, CFxHandle, paramDict, ModuleName):
         super(TincanInterface, self).__init__(CFxHandle, paramDict, ModuleName)
-        self.trans_counter = 0
-        self.CONFIG = paramDict
-        self.TincanListenerThread = None
+        self.trans_counter = 0  # Counter to send transaction number for every TINCAN request
+        self.CONFIG = paramDict  # Dictionary object containing configuration details loaded from the ipop-config file
+        self.TincanListenerThread = None    # Class data member to hold UDP listener Thread object
+        # Check whether the system supports IPv6
         if socket.has_ipv6:
             self.sock = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
             self.sock_svr = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
+            # Attribute to hold Controller UDP listening socket
             self.sock_svr.bind((self.CONFIG["localhost6"], self.CONFIG["ctrl_recv_port"]))
+            # Attribute to hold Controller UDP sending socket
             self.dest = (self.CONFIG["localhost6"], self.CONFIG["ctrl_send_port"])
         else:
             self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             self.sock_svr = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            # Attribute to hold Controller UDP listening socket
             self.sock_svr.bind((self.CONFIG["localhost"], self.CONFIG["ctrl_recv_port"]))
+            # Attribute to hold Controller UDP sending socket
             self.dest = (self.CONFIG["localhost"], self.CONFIG["ctrl_send_port"])
         self.sock.bind(("", 0))
         self.sock_list = [self.sock_svr]
@@ -34,13 +39,15 @@ class TincanInterface(ControllerModule):
         while True:
             socks, _, _ = select.select(self.sock_list, [], [],
                                         self.CONFIG["SocketReadWaitTime"])
-
+            # Iterate across all socket list to obtain Tincan messages
             for sock in socks:
                 if sock == self.sock_svr:
                     data, addr = sock.recvfrom(self.CMConfig["buf_size"])
+                    # Create CBT to process every Tincan message
                     self.registerCBT('TincanInterface', 'PROCESS_TINCAN_DATA', data)
 
     def processCBT(self, cbt):
+        # CBT to process Link Creation
         if cbt.action == 'DO_CREATE_LINK':
             uid = cbt.data.get('uid')
             msg = cbt.data.get("data")
@@ -54,11 +61,11 @@ class TincanInterface(ControllerModule):
             conn_details["PeerInfo"]["MAC"] = msg.get('mac')
             conn_details["PeerInfo"]["CAS"] = msg.get('cas')
             conn_details["PeerInfo"]["Fingerprint"] = msg.get('fpr')
-            conn_details["PeerInfo"]["con_type"] = msg.get("con_type")
             conn_details["Initiator"] = cbt.initiator
             self.send_msg(json.dumps(connection_details))
             self.registerCBT('Logger', 'debug', "Connection Details : {0}".format(str(conn_details)))
             self.registerCBT('Logger', 'info', "Creating Connection to Peer:{0}".format(uid))
+        # CBT to process Link deletion request
         elif cbt.action == 'DO_TRIM_LINK':
             uid = cbt.data.get("uid")
             remove_node_details = ipoplib.REMOVE
@@ -71,6 +78,7 @@ class TincanInterface(ControllerModule):
             log = "Tincan Request : {0}".format(str(remove_node_details["IPOP"]))
             self.registerCBT('Logger', 'debug', log)
             self.registerCBT('Logger', 'info', "Removing Connection to : {0}".format(uid))
+        # CBT to process Query Link state
         elif cbt.action == 'DO_GET_STATE':
             get_state_request = ipoplib.LSTATE
             get_state_request["IPOP"]["TransactionId"] = self.trans_counter
@@ -79,11 +87,11 @@ class TincanInterface(ControllerModule):
             get_state_request["IPOP"]["Request"]["InterfaceName"] = cbt.data.get("interface_name")
             get_state_request["IPOP"]["Request"]["UID"] = cbt.data.get("uid")
             get_state_request["IPOP"]["Request"]["MAC"] = cbt.data.get("MAC")
-            get_state_request["IPOP"]["Request"]["con_type"] = cbt.data.get("con_type", None)
             get_state_request["IPOP"]["Request"]["Initiator"] = cbt.initiator
             self.send_msg(json.dumps(get_state_request))
             log = "Tincan Request: {0}".format(str(get_state_request["IPOP"]))
             self.registerCBT('Logger', 'debug', log)
+        # CBT to process GET CAS for a given peer MAC address
         elif cbt.action == 'DO_GET_CAS':
             lcas = ipoplib.LCAS
             data = cbt.data
@@ -95,10 +103,10 @@ class TincanInterface(ControllerModule):
             lcas["IPOP"]["Request"]["PeerInfo"]["Fingerprint"] = data["data"]["fpr"]
             lcas["IPOP"]["Request"]["PeerInfo"]["UID"] = uid
             lcas["IPOP"]["Request"]["PeerInfo"]["MAC"] = data["data"]["mac"]
-            lcas["IPOP"]["Request"]["PeerInfo"]["con_type"] = data["data"]["con_type"]
             lcas["IPOP"]["Request"]["Initiator"] = cbt.initiator
             self.registerCBT('Logger', 'debug', "Get CAS Request: {0}".format(str(lcas["IPOP"])))
             self.send_msg(json.dumps(lcas))
+        # CBT message to keep Tincan and controller channel up and running
         elif cbt.action == 'DO_ECHO':
             ec = ipoplib.ECHO
             ec["IPOP"]["Request"]["InterfaceName"] = cbt.data.get("interface_name")
@@ -106,6 +114,7 @@ class TincanInterface(ControllerModule):
             ec["IPOP"]["Request"]["Initiator"] = cbt.initiator
             self.trans_counter += 1
             self.send_msg(json.dumps(ec))
+        # CBT to send ICC message via overlay
         elif cbt.action == 'DO_SEND_ICC_MSG':
             icc_message_details = ipoplib.ICC
             icc_message_details["IPOP"]["TransactionId"] = self.trans_counter
@@ -119,6 +128,7 @@ class TincanInterface(ControllerModule):
             self.send_msg(json.dumps(icc_message_details))
             log = "Sending ICC Message: {0}".format(str(icc_message_details["IPOP"]))
             self.registerCBT('Logger', 'debug', log)
+        # CBT to process request to insert data into the local network interface
         elif cbt.action == 'DO_INSERT_DATA_PACKET':
             packet = ipoplib.INSERT_TAP_PACKET
             packet["IPOP"]["TransactionId"] = self.trans_counter
@@ -128,10 +138,12 @@ class TincanInterface(ControllerModule):
             self.send_msg(json.dumps(packet))
             log = "Inserting Network Packet: {0}".format(str(packet["IPOP"]))
             self.registerCBT('Logger', 'debug', log)
+        # CBT to retry any Tincan Request
         elif cbt.action == 'DO_RETRY':
             self.send_msg(json.dumps(cbt.data))
-        elif cbt.action == "DO_INSERT_ROUTING_RULES":
-            add_routing = ipoplib.ADD_ROUTING
+        # CBT to process request to insert Forwarding rule in Tincan
+        elif cbt.action == "DO_INSERT_FORWARDING_RULES":
+            add_routing = ipoplib.ADD_FORWARDING_RULE
             add_routing["IPOP"]["TransactionId"] = self.trans_counter
             self.trans_counter += 1
             add_routing["IPOP"]["Request"]["InterfaceName"] = cbt.data["interface_name"]
@@ -143,8 +155,9 @@ class TincanInterface(ControllerModule):
                     log = "Inserting Routing Rule: {0}".format(str(add_routing["IPOP"]))
                     self.registerCBT('Logger', 'debug', log)
                     self.send_msg(json.dumps(add_routing))
-        elif cbt.action == "DO_REMOVE_ROUTING_RULES":
-            remove_routing = ipoplib.DELETE_ROUTING
+        # CBT to process request to remove Forwarding rule in Tincan
+        elif cbt.action == "DO_REMOVE_FORWARDING_RULES":
+            remove_routing = ipoplib.DELETE_FORWARDING_RULE
             remove_routing["IPOP"]["TransactionId"] = self.trans_counter
             self.trans_counter += 1
             remove_routing["IPOP"]["Request"]["InterfaceName"] = cbt.data["interface_name"]
@@ -153,6 +166,7 @@ class TincanInterface(ControllerModule):
             log = "Routing Rule Removed: {0}".format(str(remove_routing["IPOP"]))
             self.registerCBT('Logger', 'debug', log)
             self.send_msg(json.dumps(remove_routing))
+        # CBT to process request to send any message to Tincan
         elif cbt.action == "DO_SEND_TINCAN_MSG":
             data = cbt.data
             data["IPOP"]["TransactionId"] = self.trans_counter
@@ -161,21 +175,22 @@ class TincanInterface(ControllerModule):
             self.send_msg(json.dumps(data))
             log = "Data sent to Tincan: {0}".format(str(data))
             self.registerCBT('Logger', 'debug', log)
+        # CBT to process messages from Tincan
         elif cbt.action == "PROCESS_TINCAN_DATA":
-            interface_name = ""
-            data = cbt.data
+            interface_name, data = "", cbt.data
             tincan_resp_msg = json.loads(data.decode("utf-8"))["IPOP"]
+            # Extract the Operation from the Tincan message
             req_operation = tincan_resp_msg["Request"]["Command"]
 
             # Check if tap name exits in the TINCAN Response Message
             if "InterfaceName" in tincan_resp_msg["Request"].keys():
                 interface_name = tincan_resp_msg["Request"]["InterfaceName"]
 
-            # Check whether Tincan Message is UpdateRoute or ICC Message
+            # Condition to check if Tincan Message not an UpdateRoute or an ICC Message
             if "Response" in tincan_resp_msg.keys():
-
-                # check whether the Tican response is Success message
+                # check whether the Tincan response is Success message
                 if tincan_resp_msg["Response"]["Success"] is True:
+                    # Whether the response is for GET_NODE_STATE operation
                     if req_operation == "QueryNodeInfo":
                         resp_msg = json.loads(tincan_resp_msg["Response"]["Message"])
                         resp_target_module = tincan_resp_msg["Request"]["Initiator"]
@@ -199,7 +214,6 @@ class TincanInterface(ControllerModule):
                                     "type": "peer_state",
                                     "uid": tincan_resp_msg["Request"]["UID"],
                                     "ip4": resp_msg["VIP4"],
-                                    "con_type": tincan_resp_msg["Request"].get("con_type", None),
                                     "fpr": resp_msg["Fingerprint"],
                                     "mac": resp_msg["MAC"],
                                     "status": resp_msg["Status"],
@@ -211,7 +225,6 @@ class TincanInterface(ControllerModule):
                                     "type": "peer_state",
                                     "uid": tincan_resp_msg["Request"]["UID"],
                                     "ip4": "",
-                                    "con_type": tincan_resp_msg["Request"].get("con_type", None),
                                     "fpr": "",
                                     "mac": "",
                                     "ttl": "",
@@ -223,27 +236,25 @@ class TincanInterface(ControllerModule):
                             log = "Peer UID:{0} State:{1}".format(tincan_resp_msg["Request"]["UID"], resp_msg["Status"])
                             self.registerCBT('Logger', 'debug', log)
                             self.registerCBT(resp_target_module, 'TINCAN_CONTROL', msg)
-
+                    # Whether the response is for DO_GET_CAS operation
                     elif req_operation == "CreateLinkListener":
-                        # Sends the CAS to BaseTopologyManger
+                        # Sends the CAS to LinkManager
                         resp_target_module = tincan_resp_msg["Request"]["Initiator"]
                         log = "Received data from Tincan for operation: {0}. Data: {1}".\
                             format(tincan_resp_msg["Request"]["Command"], str(tincan_resp_msg))
                         self.registerCBT('Logger', 'info', log)
                         msg = {
-                            "type": "con_ack",
                             "uid": tincan_resp_msg["Request"]["PeerInfo"]["UID"],
                             "data": {
                                 "fpr": tincan_resp_msg["Request"]["PeerInfo"]["Fingerprint"],
                                 "cas": tincan_resp_msg['Response']['Message'],
-                                "con_type": tincan_resp_msg["Request"]["PeerInfo"]["con_type"],
                                 "peer_mac": tincan_resp_msg["Request"]["PeerInfo"]["MAC"]
                             },
                             "interface_name": interface_name
                         }
-                        self.registerCBT(resp_target_module, 'GET_CAS_DETAILS', msg)
+                        self.registerCBT(resp_target_module, 'SEND_CAS_DETAILS', msg)
                     elif req_operation == "ConnectToPeer":
-                        # Response message for Connection Request for a link
+                        # Response message for Connection Request for a p2plink
                         log = "Received data from Tincan for operation: {0} Data: {1}".format\
                             (tincan_resp_msg["Request"]["Command"], str(tincan_resp_msg))
                         self.registerCBT('Logger', 'debug', log)
@@ -253,7 +264,6 @@ class TincanInterface(ControllerModule):
                             "data": {
                                 "fpr": tincan_resp_msg["Request"]["PeerInfo"]["Fingerprint"],
                                 "cas": tincan_resp_msg["Request"]["PeerInfo"]["CAS"],
-                                "con_type": tincan_resp_msg["Request"]["PeerInfo"]["con_type"]
                             },
                             "status": "offline",
                             "interface_name": interface_name
@@ -270,26 +280,23 @@ class TincanInterface(ControllerModule):
                             .format(cbt.recipient, cbt.action, cbt.initiator, cbt.data)
                         self.registerCBT('Logger', 'warning', log)
                 else:
-                    log = 'Tincan Failure:: '.format(cbt.data)
+                    log = 'Tincan Failure Status for request:: '.format(cbt.data)
                     self.registerCBT('Logger', 'warning', log)
             else:
-                # Checks whether the message is ICC or UpdateRoute
+                # Checks whether the message is an ICC message
                 if req_operation == "ICC":
                     iccmsg = json.loads(tincan_resp_msg["Request"]["Data"])
                     self.registerCBT('Logger', 'debug', "ICC Message Received ::" + str(iccmsg))
-
-                    # Checks whether ICC message is routing related
                     if "msg" in iccmsg.keys():
                         iccmsg["msg"]["type"] = "remote"
                         iccmsg["msg"]["interface_name"] = tincan_resp_msg["Request"]["InterfaceName"]
-
                         if "message_type" in iccmsg["msg"]:
                             # Check whether data routed is Packetdata
                             if iccmsg["msg"]["message_type"] == "BroadcastPkt":
                                 dataframe = iccmsg["msg"]["dataframe"]
                                 # Check whether the Packet is ARP Packet
                                 if dataframe[24:28] == "0806":
-                                    self.registerCBT('NodeDiscovery', 'ARPPacket', iccmsg["msg"])
+                                    self.registerCBT('UnmanagedNodeDiscovery', 'ARPPacket', iccmsg["msg"])
                                 # Check whether packet is IPMulticast Packet
                                 elif dataframe[0:6] == "01005E":
                                     self.registerCBT('IPMulticast', 'multicast', iccmsg["msg"])
@@ -303,7 +310,7 @@ class TincanInterface(ControllerModule):
                                 iccmessage["interface_name"] = tincan_resp_msg["Request"]["InterfaceName"]
                                 # Check the control data message type so that it routes to appropriate module
                                 if iccmessage["message_type"] == "SendMacDetails":
-                                    self.registerCBT('NodeDiscovery', 'PeerMACIPDetails', iccmessage)
+                                    self.registerCBT('UnmanagedNodeDiscovery', 'PeerMACIPDetails', iccmessage)
                                 self.registerCBT('BroadCastForwarder', 'BroadcastData', iccmsg["msg"])
                             else:
                                 self.registerCBT('BaseTopologyManager', 'ICC_CONTROL', iccmsg["msg"])
@@ -326,7 +333,6 @@ class TincanInterface(ControllerModule):
 
                     log = "Tincan Packet received ::{0}".format(datagram)
                     self.registerCBT('Logger', 'debug', log)
-
                     # Check whether Packet is IP message then route it to BTM's packet handling method
                     if str(msg[24:28]) == "0800":
                         datagram["m_type"] = "IP"
@@ -334,7 +340,7 @@ class TincanInterface(ControllerModule):
                     # Check whether Packet is ARP message then route to ARPManager
                     elif str(msg[24:28]) == "0806":
                         datagram["m_type"] = "ARP"
-                        self.registerCBT('NodeDiscovery', 'ARPPacket', datagram)
+                        self.registerCBT('UnmanagedNodeDiscovery', 'ARPPacket', datagram)
                     # Send all other Packets for Broadcast
                     else:
                         datagram["message_type"] = "BroadcastPkt"
