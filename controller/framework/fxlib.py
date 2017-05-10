@@ -63,14 +63,15 @@ CONFIG = {
     },
     "BaseTopologyManager": {
         "Enabled": True,
-        "TimerInterval": 15,            # Timer thread interval in sec
+        "TimerInterval": 5,            # Timer thread interval in sec
         "NumberOfSuccessors": 2,        # Max number of successor links
         "NumberOfChords": 0,            # Max number of chord links
         "NumberOfOnDemand": 0,          # Max number of Ondemand Links
         "NumberOfInbound": 20,          # Max number of Inbound links
         "OnDemandLinkTTL": 60,          # Time to Live for an Ondemand Link
-        "OndemandThreshold": 1000,      # No of messages after which an Ondemand link would be created
+        "OndemandThreshold": 100,       # No of messages after which an Ondemand link would be created
         "OndemandConnectionWaitTime": 15,   # Wait time between each Ondemand Link creation
+        "OndemandDataTransferRate": 100,  # Ondemand link DataTransferRate
         "dependencies": ["Logger", "VirtualNetworkInitializer", "TincanInterface", "XmppClient"]
     },
     "OverlayVisualizer": {

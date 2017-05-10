@@ -206,7 +206,7 @@ class TincanInterface(ControllerModule):
                             }
                             log = "current state of {0} : {1}".format(resp_msg["UID"], str(msg))
                             self.registerCBT('Logger', 'debug', log)
-                            self.registerCBT(resp_target_module, 'TINCAN_CONTROL', msg)
+                            self.registerCBT(resp_target_module, 'TINCAN_RESPONSE', msg)
                         else:
                             # Checks whether the link to peer is in Unknown state
                             if resp_msg["Status"] != "unknown":
@@ -235,7 +235,7 @@ class TincanInterface(ControllerModule):
                                 }
                             log = "Peer UID:{0} State:{1}".format(tincan_resp_msg["Request"]["UID"], resp_msg["Status"])
                             self.registerCBT('Logger', 'debug', log)
-                            self.registerCBT(resp_target_module, 'TINCAN_CONTROL', msg)
+                            self.registerCBT(resp_target_module, 'TINCAN_RESPONSE', msg)
                     # Whether the response is for DO_GET_CAS operation
                     elif req_operation == "CreateLinkListener":
                         # Sends the CAS to LinkManager
@@ -252,7 +252,7 @@ class TincanInterface(ControllerModule):
                             },
                             "interface_name": interface_name
                         }
-                        self.registerCBT(resp_target_module, 'SEND_CAS_DETAILS', msg)
+                        self.registerCBT(resp_target_module, 'SEND_CAS_DETAILS_TO_PEER', msg)
                     elif req_operation == "ConnectToPeer":
                         # Response message for Connection Request for a p2plink
                         log = "Received data from Tincan for operation: {0} Data: {1}".format\
@@ -297,9 +297,12 @@ class TincanInterface(ControllerModule):
                                 # Check whether the Packet is ARP Packet
                                 if dataframe[24:28] == "0806":
                                     self.registerCBT('UnmanagedNodeDiscovery', 'ARPPacket', iccmsg["msg"])
-                                # Check whether packet is IPMulticast Packet
+                                # Check whether packet is IPv4 Multicast Packet
                                 elif dataframe[0:6] == "01005E":
-                                    self.registerCBT('IPMulticast', 'multicast', iccmsg["msg"])
+                                    self.registerCBT('IPMulticast', 'IPv4_MULTICAST', iccmsg["msg"])
+                                # Check whether packet is IPv6 Multicast Packet
+                                elif dataframe[0:4] == "3300":
+                                    self.registerCBT('IPMulticast', 'IPv6_MULTICAST', iccmsg["msg"])
                                 else:
                                     # Broadcast other packets
                                     self.registerCBT('BroadCastForwarder', 'BroadcastPkt', iccmsg["msg"])
@@ -333,8 +336,8 @@ class TincanInterface(ControllerModule):
 
                     log = "Tincan Packet received ::{0}".format(datagram)
                     self.registerCBT('Logger', 'debug', log)
-                    # Check whether Packet is IP message then route it to BTM's packet handling method
-                    if str(msg[24:28]) == "0800":
+                    # Check for IPv4 and IPv6 Packet, if YES send it to BTM for processing
+                    if str(msg[24:28]) in ["0800", "86DD"]:
                         datagram["m_type"] = "IP"
                         self.registerCBT("BaseTopologyManager", "TINCAN_PACKET", datagram)
                     # Check whether Packet is ARP message then route to ARPManager

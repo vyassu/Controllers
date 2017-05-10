@@ -317,7 +317,7 @@ class XmppClient(ControllerModule):
                 msg["data"] = recvd_data
                 msg["interface_name"] = interface_name
                 # send this CBT to BaseTopology Manager
-                self.registerCBT('LinkManager', 'RETRIEVE_CAS_DETAILS', msg)
+                self.registerCBT('LinkManager', 'RETRIEVE_CAS_FROM_TINCAN', msg)
                 self.log("XMPP Message: Received CAS request from peer {0}".format(msg["uid"]), severity=log_level)
             elif msg_type == "sent_casdetails":
                 msg["uid"] = sender_uid

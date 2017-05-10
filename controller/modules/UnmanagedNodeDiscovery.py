@@ -6,12 +6,12 @@ class UnmanagedNodeDiscovery(ControllerModule):
         super(UnmanagedNodeDiscovery, self).__init__(CFxHandle, paramDict, ModuleName)
         # Query CFX to get properties of virtual networks configured by the user
         self.tincanparams = self.CFxHandle.queryParam("VirtualNetworkInitializer", "Vnets")
-        self.ipop_interface_details = {}
+        self.ipop_vnets_details = {}
         # Iterate across the virtual networks to get UID,IP4 and TAPName
         for k in range(len(self.tincanparams)):
             interface_name = self.tincanparams[k]["TapName"]
-            self.ipop_interface_details[interface_name] = {}
-            interface_detail = self.ipop_interface_details[interface_name]
+            self.ipop_vnets_details[interface_name] = {}
+            interface_detail = self.ipop_vnets_details[interface_name]
             interface_detail["uid"] = self.tincanparams[k]["uid"]
             interface_detail["ip"] = self.tincanparams[k]["IP4"]
             # Table to store Unmanaged Node MAC Address and IPV4 details
@@ -23,21 +23,21 @@ class UnmanagedNodeDiscovery(ControllerModule):
 
     def initialize(self):
         # Iterate across the IPOP interface to extract local node MAC details
-        for interface_name in list(self.ipop_interface_details.keys()):
+        for interface_name in list(self.ipop_vnets_details.keys()):
             self.registerCBT("LinkManager", "GET_NODE_MAC_ADDRESS", {"interface_name": interface_name})
         self.registerCBT('Logger', 'info', "{0} Loaded".format(self.ModuleName))
 
     def processCBT(self, cbt):
         frame = cbt.data.get("dataframe")
         interface_name = cbt.data["interface_name"]
-        interface_details = self.ipop_interface_details[interface_name]
+        interface_details = self.ipop_vnets_details[interface_name]
         srcmac, destmac, srcip, destip, op = "", "", "", "", 0
 
         # Populate Local UID's MAC details. Data is send by LinkManager
         if cbt.action == "NODE_MAC_ADDRESS":
             # Check whether LinkManager has send a valid MAC Address if not request for MAC details again
             if cbt.data.get("localmac") != "":
-                self.ipop_interface_details[interface_name]["mac"] = cbt.data.get("localmac")
+                self.ipop_vnets_details[interface_name]["mac"] = cbt.data.get("localmac")
             else:
                 self.registerCBT("LinkManager", "GET_NODE_MAC_ADDRESS", {"interface_name": interface_name})
             return
@@ -51,10 +51,9 @@ class UnmanagedNodeDiscovery(ControllerModule):
                 "uid": src_uid,
                 "mac_ip_table": mac_ip_table,
                 "interface_name": interface_name,
-                "location": "remote",
-                "type": "update_mac_uid_ip_table"
+                "location": "remote"
             }
-            self.registerCBT('BaseTopologyManager', 'TINCAN_CONTROL', UpdateBTMMacUIDTable)
+            self.registerCBT('BaseTopologyManager', 'UPDATE_MAC_UID_IP_TABLES', UpdateBTMMacUIDTable)
             return
         # Process ARP Packets received
         elif cbt.action == "ARPPacket":
@@ -93,8 +92,7 @@ class UnmanagedNodeDiscovery(ControllerModule):
                     "uid": local_uid,
                     "mac_ip_table": mac_ip_table,
                     "interface_name": interface_name,
-                    "location": "local",
-                    "type": "update_mac_uid_ip_table"
+                    "location": "local"
                 }
             else:
                 uid = cbt.data["init_uid"]          # Get the remote control UID
@@ -106,18 +104,17 @@ class UnmanagedNodeDiscovery(ControllerModule):
                     "uid": uid,
                     "mac_ip_table": mac_ip_table,
                     "interface_name": interface_name,
-                    "location": "remote",
-                    "type": "update_mac_uid_ip_table"
+                    "location": "remote"
                 }
             # Update BTM MAC-UID-IP Tables
-            self.registerCBT('BaseTopologyManager', 'TINCAN_CONTROL', UpdateBTMMacUIDTable)
+            self.registerCBT('BaseTopologyManager', 'UPDATE_MAC_UID_IP_TABLES', UpdateBTMMacUIDTable)
 
             # Broadcast the ARP Message using the Overlay
-            if destip != self.ipop_interface_details[interface_name]["ip"]:
+            if destip != self.ipop_vnets_details[interface_name]["ip"]:
                 self.registerCBT('BroadCastForwarder', 'BroadcastPkt', cbt.data)
-            elif destip == self.ipop_interface_details[interface_name]["ip"] and srcip == "0.0.0.0":
+            elif destip == self.ipop_vnets_details[interface_name]["ip"] and srcip == "0.0.0.0":
                 self.registerCBT('BroadCastForwarder', 'BroadcastPkt', cbt.data)
-            elif destmac in list(self.ipop_interface_details[interface_name]["local_mac_ip_table"].keys()):
+            elif destmac in list(self.ipop_vnets_details[interface_name]["local_mac_ip_table"].keys()):
                 self.registerCBT('TincanInterface', 'DO_INSERT_DATA_PACKET', cbt.data)
             else:
                 self.registerCBT('TincanInterface', 'DO_INSERT_DATA_PACKET', cbt.data)

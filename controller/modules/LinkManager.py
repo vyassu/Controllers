@@ -20,6 +20,7 @@ class LinkManager(ControllerModule):
             self.link_details[interface_name]["uid"] = tincanparams[k]["uid"]
             # Attribute to store Peer2Peer link details
             self.link_details[interface_name]["peers"] = {}
+            self.link_details[interface_name]["ipop_state"] = {}
             # Attribute to store p2p link with online as link status
             self.link_details[interface_name]["online_peer_uid"] = []
         # Member data to hold value for p2plink retries (value entered in config file)
@@ -59,23 +60,21 @@ class LinkManager(ControllerModule):
     # Request CAS Details from Peer UID
     def request_cas(self, uid, interface_name):
         link_data = self.link_details[interface_name]
-        '''
-        if uid < link_data["ipop_state"]["_uid"]:
-            self.registerCBT('Logger', 'info',"Dropping p2plink request to Node with SmallerUID. {0}".format(uid))
-            return
-        '''
         self.registerCBT('Logger', 'debug', "Peer Table::" + str(link_data["peers"]))
         # Set the initial Time To Live for p2plink(time within which its status has to change Online)
         ttl = time.time() + self.CMConfig["InitialLinkTTL"]
-
+        if uid < self.link_details[interface_name]["ipop_state"]["_uid"]:
+            self.registerCBT('Logger', 'info', "Dropping connection to smaller UID node")
+            return
         # Check whether the request is for a new p2plink to the Peer
         if uid not in link_data["peers"].keys():
             # add peer to peers list
             link_data["peers"][uid] = {
-                    "uid": uid,
-                    "ttl": ttl,
-                    "status": "sent_link_req",
-                    "mac": ""
+                "uid": uid,
+                "ttl": ttl,
+                "status": "sent_link_req",
+                "mac": "",
+                "stats": []
             }
         # check whether the p2plink request is already in progress but not in
         # connected state then allow p2plink creation to proceed
@@ -108,41 +107,8 @@ class LinkManager(ControllerModule):
                     if mac is not None and mac != "":
                         msg = {"interface_name": interface_name, "uid": uid, "MAC": mac}
                         self.registerCBT('TincanInterface', 'DO_TRIM_LINK', msg)
-            peer_mac = self.link_details[interface_name]["peers"][uid]["mac"]
-            # Send message to BTM to remove the UID from its Table
-            #self.registerCBT("BaseTopologyManager", "UPDATE_LINK_DETAILS", {"uid": uid,
-                                                                                #"interface_name": interface_name,
-                                                                                #"msg_type": "remove_link",
-                                                                                #"mac": peer_mac})
             del peer_details[uid]
             self.registerCBT('Logger', 'info', "Removed Connection to Peer UID: {0}".format(uid))
-
-    # Update p2plink details for e.g. Time To Live, Status, Stats, MAC details
-    def update_linkdetails(self, data):
-        uid = data["uid"]
-        interface_name = data["interface_name"]
-        if uid in self.link_details[interface_name]["peers"].keys():
-            ttl = self.link_details[interface_name]["peers"][uid]["ttl"]
-            # Check whether the p2plink is online if yes extend its Time To Live
-            if "online" == data["status"]:
-                ttl = time.time() + self.CMConfig["LinkPulse"]
-                # If the p2plink has just turned Online added into the Online Peer List
-                if uid not in self.link_details[interface_name]["online_peer_uid"]:
-                    self.link_details[interface_name]["online_peer_uid"].append(uid)
-            # Connection has been removed from Tincan clear Connection Manager Table
-            elif "unknown" == data["status"]:
-                del self.link_details[interface_name]["peers"][uid]
-                if uid in self.link_details[interface_name]["online_peer_uid"]:
-                    self.link_details[interface_name]["online_peer_uid"].remove(uid)
-                return
-            else:
-                if uid in self.link_details[interface_name]["online_peer_uid"]:
-                    self.link_details[interface_name]["online_peer_uid"].remove(uid)
-            self.link_details[interface_name]["peers"][uid]["ttl"] = ttl
-            self.link_details[interface_name]["peers"][uid]["stats"] = data["stats"]
-            self.link_details[interface_name]["peers"][uid]["status"] = data["status"]
-            self.link_details[interface_name]["peers"][uid]["status"] = data["status"]
-            self.link_details[interface_name]["peers"][uid]["mac"] = data["mac"]
 
     #  remove peers with expired time-to-live attributes
     def clean_p2plinks(self, interface_name):
@@ -150,8 +116,6 @@ class LinkManager(ControllerModule):
         links = self.link_details[interface_name]
         # for uid in list(self.ipop_interface_details[interface_name]["peers"].keys()):
         for uid in links["peers"].keys():
-            # Check if there exists a link
-            # if self.linked(uid,interface_name):
             # check whether the time to link has expired
             if time.time() > links["peers"][uid]["ttl"]:
                 log = "Time to Live expired going to remove peer: {0}".format(uid)
@@ -184,31 +148,20 @@ class LinkManager(ControllerModule):
                     self.registerCBT('Logger', 'info', log_msg)
                     response_msg["ttl"] = ttl
                     self.send_msg_srv("sent_peer_casdetails", uid, json.dumps(response_msg), interface_name)
-                    # else if node has sent p2plinkrequest concurrently
+                # else if node has sent p2plinkrequest concurrently
                 elif peer[uid]["status"] == "sent_link_req":
                     # peer with Bigger UID sends a response
                     # if (self.link_details[interface_name]["ipop_state"]["_uid"] > uid):
                     self.registerCBT('Logger', 'info', "Sending CAS details to peer UID:{0}".format(uid))
                     peer[uid] = {
-                            "uid": uid,
-                            "ttl": ttl,
-                            "status": "sent_casdetails",
-                            "mac": data["peer_mac"]
+                        "uid": uid,
+                        "ttl": ttl,
+                        "status": "sent_casdetails",
+                        "mac": data["peer_mac"],
+                        "stats": []
                     }
                     response_msg["ttl"] = ttl
                     self.send_msg_srv("sent_peer_casdetails", uid, json.dumps(response_msg), interface_name)
-                    '''
-                    else:
-                        log_msg = "AIL: SmallerUID ignores from {0}".format(uid)
-                        self.registerCBT('Logger', 'info', log_msg)
-                        peer[uid] = {
-                            "uid": uid,
-                            "ttl": ttl,
-                            "status": "no_response",
-                            "mac": data["peer_mac"]
-                        }
-                        return
-                    '''
                 elif peer[uid]["status"] == "offline":
                     # If the CAS has been requested for a peer UID but it is inprogress
                     if "linkretrycount" not in peer[uid].keys():
@@ -224,7 +177,8 @@ class LinkManager(ControllerModule):
                                 "uid": uid,
                                 "ttl": ttl,
                                 "status": "sent_response",
-                                "mac": data["peer_mac"]
+                                "mac": data["peer_mac"],
+                                "stats": []
                             }
                             self.registerCBT('Logger', 'info', "Sending CAS details to peer UID:{0}".format(uid))
                             response_msg["ttl"] = ttl
@@ -252,10 +206,11 @@ class LinkManager(ControllerModule):
                 # if self.link_details[interface_name]["ipop_state"]["_uid"] > uid:
                 ttl = time.time() + self.CMConfig["InitialLinkTTL"]
                 peer[uid] = {
-                        "uid": uid,
-                        "ttl": ttl,
-                        "status": "recv_cas_details",
-                        "mac": data["peer_mac"]
+                    "uid": uid,
+                    "ttl": ttl,
+                    "status": "recv_cas_details",
+                    "mac": data["peer_mac"],
+                    "stats": []
                 }
                 response_msg["ttl"] = ttl
                 self.send_msg_srv("sent_peer_casdetails", uid, json.dumps(response_msg), interface_name)
@@ -274,12 +229,6 @@ class LinkManager(ControllerModule):
         self.registerCBT('Logger', 'info', "Received CAS from Peer ({0})".format(uid))
         # Send the Create Connection request to Tincan Interface
         self.registerCBT('TincanInterface', 'DO_CREATE_LINK', msg)
-        # Update BTM Table for the new Link
-        # self.registerCBT("BaseTopologyManager", "UPDATE_LINK_DETAILS", {"uid": uid,
-                                                                            #"interface_name": interface_name,
-                                                                            #"msg_type": "add_link",
-                                                                            #"mac": peer_mac,
-                                                                            #"status": "offline"})
 
     # Advertise all Online Peer to each node in the network
     def advertise_p2plinks(self, interface_name):
@@ -297,26 +246,22 @@ class LinkManager(ControllerModule):
     def processCBT(self, cbt):
         if cbt.action == "REMOVE_LINK":
             self.remove_p2plink(cbt.data.get("uid"), cbt.data.get("interface_name"))
-        elif cbt.action == "GET_PEER_CAS_DETAILS":
+        elif cbt.action == "CREATE_LINK":
             self.request_cas(cbt.data.get("uid"), cbt.data.get("interface_name"))
-        elif cbt.action == "RETRIEVE_CAS_DETAILS":
+        elif cbt.action == "RETRIEVE_CAS_FROM_TINCAN":
             msg = cbt.data
-            msg["data"] = json.loads(msg["data"])
             uid = msg["uid"]
-            # interface_name = msg["interface_name"]
-            log = "Received peer {0} req to retrieve CAS details.".format(uid)
-            self.registerCBT('Logger', 'debug', log)
-            # if uid < self.link_details[interface_name]["ipop_state"]["_uid"]:
+            msg["data"] = json.loads(msg["data"])
+            self.registerCBT('Logger', 'debug', "Received peer {0} req to retrieve CAS details.".format(uid))
             self.registerCBT('TincanInterface', 'DO_GET_CAS', msg)
+            # Request Peer CAS details for two way connection
+            if uid not in self.link_details[msg["interface_name"]]["peers"].keys():
+                self.request_cas(uid, msg["interface_name"])
         elif cbt.action == "CREATE_P2PLINK":
             msg = cbt.data
-            interface_name = msg.get("interface_name")
             msg["data"] = json.loads(msg["data"])
-            uid = msg["uid"]
-            self.create_p2plink(uid, interface_name, msg)
-        elif cbt.action == "UPDATE_LINK_DETAILS":
-            self.update_linkdetails(cbt.data)
-        elif cbt.action == "SEND_CAS_DETAILS":
+            self.create_p2plink(msg["uid"], msg.get("interface_name"), msg)
+        elif cbt.action == "SEND_CAS_DETAILS_TO_PEER":
             msg = cbt.data
             interface_name = msg["interface_name"]
             self.send_casdetails(msg["uid"], msg["data"], interface_name)
@@ -339,11 +284,12 @@ class LinkManager(ControllerModule):
                 message.update({peeruid: {
                     "ttl": linkdetails["ttl"],
                     "status": linkdetails["status"],
-                    "mac": linkdetails["mac"]
+                    "mac": linkdetails["mac"],
+                    "stats": linkdetails["stats"]
                 }})
             self.registerCBT(cbt.initiator, "RETRIEVE_LINK_DETAILS", {"interface_name": interface_name,
                                                                           "data": message})
-        elif cbt.action == "TINCAN_CONTROL":
+        elif cbt.action == "TINCAN_RESPONSE":
             msg = cbt.data
             msg_type = msg.get("type", None)
             interface_name = msg["interface_name"]
@@ -384,20 +330,19 @@ class LinkManager(ControllerModule):
                     # update peer state within BTM Tables
                     interface_details["peers"][uid].update(msg)
                     interface_details["peers"][uid]["ttl"] = ttl
-
-            elif msg_type == "get_online_peerlist":
-                interface_name = cbt.data["interface_name"]
-                cbtdt = {'peerlist': self.link_details[interface_name]["online_peer_uid"],
-                         'uid': interface_details["ipop_state"]["_uid"],
-                         'mac': interface_details["mac"],
-                         'interface_name': interface_name
-                         }
-                # Send the Online PeerList to the Initiator of CBT
-                self.registerCBT(cbt.initiator, 'ONLINE_PEERLIST', cbtdt)
             else:
                 log = '{0}: unrecognized CBT message {1} received from {2}.Data:: {3}' \
                     .format(cbt.recipient, cbt.action, cbt.initiator, cbt.data)
                 self.registerCBT('Logger', 'warning', log)
+        elif cbt.action == "GET_ONLINE_PEERLIST":
+            interface_name = cbt.data["interface_name"]
+            cbtdt = {'peerlist': self.link_details[interface_name]["online_peer_uid"],
+                     'uid': self.link_details[interface_name]["ipop_state"]["_uid"],
+                     'mac': self.link_details[interface_name]["mac"],
+                     'interface_name': interface_name
+                     }
+            # Send the Online PeerList to the Initiator of CBT
+            self.registerCBT(cbt.initiator, 'ONLINE_PEERLIST', cbtdt)
         else:
             log = '{0}: unrecognized CBT message {1} received from {2}.Data:: {3}' \
                     .format(cbt.recipient, cbt.action, cbt.initiator, cbt.data)
