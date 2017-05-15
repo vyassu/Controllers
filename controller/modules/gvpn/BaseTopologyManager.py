@@ -410,8 +410,10 @@ class BaseTopologyManager(ControllerModule, CFX):
         elif cbt.action == "GET_VISUALIZER_DATA":
             for interface_name in self.ipop_vnets_details.keys():
                 virtual_net_details = self.ipop_vnets_details[interface_name]
-                local_uid = virtual_net_details["ipop_state"]["_uid"]
-                local_ip = virtual_net_details["ipop_state"]["_ip4"]
+                local_uid, local_ip = "", ""
+                if "ipop_state" in virtual_net_details.keys():
+                    local_uid = virtual_net_details["ipop_state"]["_uid"]
+                    local_ip = virtual_net_details["ipop_state"]["_ip4"]
                 unmanaged_node_list, successors, chords, on_demands = [], [], [], []
 
                 # Iterate over the IP-UID Table to retrieve Unmanaged node IP list
@@ -709,6 +711,7 @@ class BaseTopologyManager(ControllerModule, CFX):
                 self.manage_topology(interface_name)
                 # Periodically query LinkManager for Peer2Peer Link Details
                 self.registerCBT("LinkManager", "GET_LINK_DETAILS", {"interface_name": interface_name})
-
+                if self.ipop_vnets_details[interface_name]["p2p_state"] == "started":
+                    self.registerCBT('TincanInterface', 'DO_GET_STATE', {"interface_name": interface_name, "MAC": ""})
         except Exception as err:
             self.registerCBT('Logger', 'error', "Exception in BTM timer:" + str(err))

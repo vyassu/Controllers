@@ -81,7 +81,7 @@ CONFIG = {
         "WebServiceDataPostInterval": 5,            # Interval to send data to the visualizer
         "TimerInterval": 1,                         # Timer thread interval
         "NodeName": "",                             # Node Name as seen from the UI
-        "dependencies": ["Logger"]
+        "dependencies": ["Logger", "VirtualNetworkInitializer", "TincanInterface", "XmppClient"]
     }
 }
 

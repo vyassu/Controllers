@@ -336,13 +336,14 @@ class LinkManager(ControllerModule):
                 self.registerCBT('Logger', 'warning', log)
         elif cbt.action == "GET_ONLINE_PEERLIST":
             interface_name = cbt.data["interface_name"]
-            cbtdt = {'peerlist': self.link_details[interface_name]["online_peer_uid"],
-                     'uid': self.link_details[interface_name]["ipop_state"]["_uid"],
-                     'mac': self.link_details[interface_name]["mac"],
-                     'interface_name': interface_name
-                     }
-            # Send the Online PeerList to the Initiator of CBT
-            self.registerCBT(cbt.initiator, 'ONLINE_PEERLIST', cbtdt)
+            if "_uid" in self.link_details[interface_name]["ipop_state"].keys():
+                cbtdt = {'peerlist': self.link_details[interface_name]["online_peer_uid"],
+                         'uid': self.link_details[interface_name]["ipop_state"]["_uid"],
+                         'mac': self.link_details[interface_name]["mac"],
+                         'interface_name': interface_name
+                }
+                # Send the Online PeerList to the Initiator of CBT
+                self.registerCBT(cbt.initiator, 'ONLINE_PEERLIST', cbtdt)
         else:
             log = '{0}: unrecognized CBT message {1} received from {2}.Data:: {3}' \
                     .format(cbt.recipient, cbt.action, cbt.initiator, cbt.data)
@@ -360,10 +361,14 @@ class LinkManager(ControllerModule):
                             "uid": peeruid
                         }
                         self.registerCBT('TincanInterface', 'DO_GET_STATE', message)
-                self.clean_p2plinks(interface_name)
-                self.advertise_p2plinks(interface_name)
+                if "_uid" not in self.link_details[interface_name]["ipop_state"].keys():
+                    msg = {"interface_name": interface_name, "MAC": ""}
+                    self.registerCBT('TincanInterface', 'DO_GET_STATE', msg)
+                else:
+                     self.clean_p2plinks(interface_name)
+                     self.advertise_p2plinks(interface_name)
         except Exception as err:
-            self.registerCBT('Logger', 'error', "Exception caught in ConnectionManager timer thread.\
+            self.registerCBT('Logger', 'error', "Exception caught in LinkManager timer thread.\
                              Error: {0}".format(str(err)))
 
     def terminate(self):
