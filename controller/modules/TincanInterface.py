@@ -175,6 +175,32 @@ class TincanInterface(ControllerModule):
             self.send_msg(json.dumps(data))
             log = "Data sent to Tincan: {0}".format(str(data))
             self.registerCBT('Logger', 'debug', log)
+        elif cbt.action == 'DO_QUERY_LINK_STATS':
+            link_stat_request = ipoplib.LINK_STATS
+            link_stat_request["IPOP"]["TransactionId"] = self.trans_counter
+            self.trans_counter += 1
+            link_stat_request["IPOP"]["Request"]["ProtocolVersion"] = 4
+            link_stat_request["IPOP"]["Request"]["InterfaceName"] = cbt.data.get("interface_name")
+            link_stat_request["IPOP"]["Request"]["UID"] = cbt.data.get("uid")
+            link_stat_request["IPOP"]["Request"]["MAC"] = cbt.data.get("MAC")
+            link_stat_request["IPOP"]["Request"]["Initiator"] = cbt.initiator
+            link_stat_request["IPOP"]["Owner"] = cbt.initiator
+            self.send_msg(json.dumps(link_stat_request))
+            log = "Tincan Request: {0}".format(str(link_stat_request["IPOP"]))
+            self.registerCBT('Logger', 'debug', log)
+        elif cbt.action == 'DO_QUERY_ADDRESS_SET':
+            query_cas_request = ipoplib.QUERY_CAS
+            query_cas_request["IPOP"]["TransactionId"] = self.trans_counter
+            self.trans_counter += 1
+            query_cas_request["IPOP"]["Request"]["ProtocolVersion"] = 4
+            query_cas_request["IPOP"]["Request"]["InterfaceName"] = cbt.data.get("interface_name")
+            query_cas_request["IPOP"]["Request"]["UID"] = cbt.data.get("uid")
+            query_cas_request["IPOP"]["Request"]["MAC"] = cbt.data.get("MAC")
+            query_cas_request["IPOP"]["Request"]["Initiator"] = cbt.initiator
+            query_cas_request["IPOP"]["Owner"] = cbt.initiator
+            self.send_msg(json.dumps(query_cas_request))
+            log = "Tincan Request: {0}".format(str(query_cas_request["IPOP"]))
+            self.registerCBT('Logger', 'debug', log)
         # CBT to process messages from Tincan
         elif cbt.action == "PROCESS_TINCAN_DATA":
             interface_name, data = "", cbt.data
@@ -217,7 +243,6 @@ class TincanInterface(ControllerModule):
                                     "fpr": resp_msg["Fingerprint"],
                                     "mac": resp_msg["MAC"],
                                     "status": resp_msg["Status"],
-                                    "stats": resp_msg["Stats"],
                                     "interface_name": interface_name
                                 }
                             else:
@@ -229,7 +254,6 @@ class TincanInterface(ControllerModule):
                                     "mac": "",
                                     "ttl": "",
                                     "rate": "",
-                                    "stats": [],
                                     "status": resp_msg["Status"],
                                     "interface_name": interface_name
                                 }
@@ -237,7 +261,7 @@ class TincanInterface(ControllerModule):
                             self.registerCBT('Logger', 'debug', log)
                             self.registerCBT(resp_target_module, 'TINCAN_RESPONSE', msg)
                     # Whether the response is for DO_GET_CAS operation
-                    elif req_operation == "CreateLinkListener":
+                    elif req_operation == "CreateTunnel":
                         # Sends the CAS to LinkManager
                         resp_target_module = tincan_resp_msg["Request"]["Initiator"]
                         log = "Received data from Tincan for operation: {0}. Data: {1}".\
@@ -253,7 +277,7 @@ class TincanInterface(ControllerModule):
                             "interface_name": interface_name
                         }
                         self.registerCBT(resp_target_module, 'SEND_CAS_DETAILS_TO_PEER', msg)
-                    elif req_operation == "ConnectToPeer":
+                    elif req_operation == "ConnectTunnel":
                         # Response message for Connection Request for a p2plink
                         log = "Received data from Tincan for operation: {0} Data: {1}".format\
                             (tincan_resp_msg["Request"]["Command"], str(tincan_resp_msg))
@@ -269,6 +293,28 @@ class TincanInterface(ControllerModule):
                             "interface_name": interface_name
                         }
                         return
+                    elif req_operation == "QueryCandidateAddressSet":
+                        resp_target_module = tincan_resp_msg["Request"]["Initiator"]
+                        if "Controlled" in tincan_resp_msg["Response"]["Message"].keys():
+                            cas  = str(tincan_resp_msg["Response"]["Message"]["Controlled"])
+                            if cas.find("stun") != -1:
+                                msg = {
+                                    "interface_name": interface_name,
+                                    "cas": cas,
+                                    "type": "set_geo_ip"
+                                }
+                                self.registerCBT(resp_target_module, 'TINCAN_RESPONSE', msg)
+                                return
+                        elif "Controlling" in tincan_resp_msg["Response"]["Message"].keys():
+                            cas  = str(tincan_resp_msg["Response"]["Message"]["Controlling"])
+                            if cas.find("stun") != -1:
+                                msg = {
+                                    "interface_name": interface_name,
+                                    "cas": cas,
+                                    "type": "set_geo_ip"
+                                }
+                                self.registerCBT(resp_target_module, 'TINCAN_RESPONSE', msg)
+                                return
                     elif req_operation in ["CreateCtrlRespLink", "ConfigureLogging", "CreateVnet",
                                            "SetIgnoredNetInterfaces", "RemovePeer"]:
                         self.registerCBT("Logger", "info", "Received data from Tincan: Operation: {0}."

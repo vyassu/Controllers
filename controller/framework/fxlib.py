@@ -38,12 +38,12 @@ CONFIG = {
         "InitialLinkTTL": 120,              # Initial Time to Live for a p2p link in sec
         "LinkPulse": 180,                   # Time to Live for an online p2p link in sec
         "MaxConnRetry": 5,                  # Max Connection Retry attempts for each p2p link
-        "dependencies": ["Logger", "VirtualNetworkInitializer", "TincanInterface", "BaseTopologyManager"]
+        "dependencies": ["Logger", "VirtualNetworkInitializer", "TincanInterface"]
     },
     "BroadCastForwarder": {
         "Enabled": True,
         "TimerInterval": 5,                # Timer thread interval in sec
-        "dependencies": ["Logger", "VirtualNetworkInitializer", "TincanInterface"]
+        "dependencies": ["Logger", "VirtualNetworkInitializer", "TincanInterface", "LinkManager"]
     },
     "UnmanagedNodeDiscovery": {
         "Enabled": True,
@@ -51,7 +51,7 @@ CONFIG = {
     },
     "IPMulticast": {
         "Enabled": True,
-        "dependencies": ["Logger", "VirtualNetworkInitializer", "TincanInterface"]
+        "dependencies": ["Logger", "VirtualNetworkInitializer", "TincanInterface", "LinkManager"]
     },
     "XmppClient": {
         "Enabled": True,
@@ -59,7 +59,7 @@ CONFIG = {
         "InitialAdvertismentDelay": 5,      # Initial delay for Peer XMPP messages
         "XmppAdvrtDelay": 5,                # Incremental delay for XMPP messages
         "MaxAdvertismentDelay": 30,         # Max XMPP Message delay
-        "dependencies": ["Logger", "VirtualNetworkInitializer", "TincanInterface"]
+        "dependencies": ["Logger", "VirtualNetworkInitializer", "TincanInterface", "LinkManager"]
     },
     "BaseTopologyManager": {
         "Enabled": True,
@@ -81,7 +81,7 @@ CONFIG = {
         "WebServiceDataPostInterval": 5,            # Interval to send data to the visualizer
         "TimerInterval": 1,                         # Timer thread interval
         "NodeName": "",                             # Node Name as seen from the UI
-        "dependencies": ["Logger", "VirtualNetworkInitializer", "TincanInterface", "XmppClient"]
+        "dependencies": ["Logger", "VirtualNetworkInitializer", "BaseTopologyManager"]
     }
 }
 

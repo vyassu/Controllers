@@ -192,18 +192,24 @@ class BaseTopologyManager(ControllerModule, CFX):
 
             self.registerCBT("BaseTopologyManager", "FORWARD_MSG", new_msg)
 
-    # Gets GEO Location IP (needed by Visualizer Module)
-    def getGeoIP(self, interface_name):
+    # Sets GEO Location IP (needed by Visualizer Module)
+    def setGeoIP(self, interface_name, cas):
         try:
-            # Iterate across all the links created by the node and extract the local address of a connected link
-            for peer_uid, link_type in list(self.ipop_vnets_details[interface_name]["link_type"].items()):
-                if self.linked(peer_uid, interface_name) and len(self.ipop_vnets_details[interface_name]
-                                                                 [link_type][peer_uid]["stats"]):
-                    return self.ipop_vnets_details[interface_name][link_type][peer_uid]["stats"][0]["local_addr"].split(":")[0]
-            return ""
+            casdetails = str(cas).split(":")
+            for i,ele in enumerate(casdetails):
+                if str(ele).count(".") == 3 :
+                    if casdetails[i-1] == "udp" and casdetails[i+5] == "stun":
+                        ip_octet = str(ele).split(".")
+                        if ip_octet[0] == "10":
+                            pass
+                        elif ip_octet[0] == "172" and ip_octet[1] in range(16,32,1):
+                            pass
+                        elif ip_octet[0] == "192" and ip_octet == "168":
+                            pass
+                        else:
+                            self.ipop_vnets_details[interface_name]["GeoIP"] = ele
         except Exception as err:
-            self.registerCBT("Logger", "error", "Exception caught while retrieving GeoIP:{0}".format(err))
-            return ""
+            self.registerCBT("Logger","error","Error while Setting GeoIP:{0}".format(err))
 
     # Method to trim stale chord connections and initiate better chord connections
     def clean_chord(self, interface_name):
@@ -318,6 +324,8 @@ class BaseTopologyManager(ControllerModule, CFX):
                     virtual_net_details["uid_mac_table"][msg["_uid"]] = [msg["mac"]]
                 self.registerCBT("Logger", "info", "Local Node Info UID:{0} MAC:{1} IP4: {2}".format(msg["_uid"],
                                 msg["mac"], msg["_ip4"]))
+            else:
+                self.setGeoIP(interface_name, msg["cas"])
         elif cbt.action == "UPDATE_MAC_UID_IP_TABLES":
             location = msg.get("location")
             uid = msg["uid"]
@@ -438,8 +446,8 @@ class BaseTopologyManager(ControllerModule, CFX):
                             on_demands.append(ondemand)
                 # Check if GEO IP exists else invoke the function to retrieve the details from Public Stun server
                 if virtual_net_details["GeoIP"] in ["", None]:
-                    geoip = self.getGeoIP(interface_name)
-                    virtual_net_details["GeoIP"] = geoip
+                    geoip = ""
+                    #virtual_net_details["GeoIP"] = geoip
                 else:
                     geoip = virtual_net_details["GeoIP"]
 
@@ -682,6 +690,10 @@ class BaseTopologyManager(ControllerModule, CFX):
                 if self.linked(peer, interface_name):
                     virtual_net_details["p2p_state"] = "connected"
                     self.registerCBT('Logger', 'info', interface_name + " p2p state: CONNECTED")
+                    linktype = virtual_net_details["link_type"][peer]
+                    self.registerCBT('TincanInterface', 'DO_QUERY_ADDRESS_SET',
+                                     {"interface_name": interface_name,
+                                      "MAC": virtual_net_details[linktype][peer]["mac"], "uid": peer})
                     return
         # connecting or connected to the IPOP peer-to-peer network
         if virtual_net_details["p2p_state"] == "connected":
@@ -690,7 +702,7 @@ class BaseTopologyManager(ControllerModule, CFX):
             self.remove_successors(interface_name)
             # periodically call policy to clean Chords and On-Demand Links
             self.clean_chord(interface_name)
-            self.clean_on_demand(interface_name)
+            #self.clean_on_demand(interface_name)
             # manage chords
             self.find_chords(interface_name)
             # Iterate across all the p2p links created by the node
@@ -713,5 +725,9 @@ class BaseTopologyManager(ControllerModule, CFX):
                 self.registerCBT("LinkManager", "GET_LINK_DETAILS", {"interface_name": interface_name})
                 if self.ipop_vnets_details[interface_name]["p2p_state"] == "started":
                     self.registerCBT('TincanInterface', 'DO_GET_STATE', {"interface_name": interface_name, "MAC": ""})
+                if len(self.ipop_vnets_details[interface_name]["on_demand"].keys()) != 0:
+                    for peeruid, linktype in list(self.ipop_vnets_details[interface_name]["on_demand"].item()):
+                        self.registerCBT('TincanInterface', 'DO_QUERY_LINK_STATS',
+                                         {"interface_name": interface_name, "MAC": linktype["mac"], "uid": peeruid})
         except Exception as err:
             self.registerCBT('Logger', 'error', "Exception in BTM timer:" + str(err))

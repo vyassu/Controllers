@@ -14,7 +14,13 @@ class Logger(ControllerModule):
         else:
             level = getattr(logging, "info")
         # Check whether the Logging is set to File by the User
-        if self.CMConfig["LogOption"] == "File":
+        if self.CMConfig["LogOption"] == "Console":
+            # Console logging
+            logging.basicConfig(format='[%(asctime)s.%(msecs)03d] %(levelname)s:%(message)s', datefmt='%Y%m%d %H:%M:%S',
+                                level=level)
+            logging.info("Logger Module Loaded")
+        else:
+            
             self.logger = logging.getLogger("IPOP Rotating Log")
             self.logger.setLevel(level)
             # Extracts the filepath for Logging else sets logs to the current working directory
@@ -26,13 +32,11 @@ class Logger(ControllerModule):
             # Creates rotating filehandler
             handler = lh.RotatingFileHandler(filename=filepath, maxBytes=self.CMConfig["LogFileSize"],
                                              backupCount=self.CMConfig["BackupLogFileCount"])
+            formatter = logging.Formatter(
+                "[%(asctime)s.%(msecs)03d] %(levelname)s:%(message)s", datefmt='%Y%m%d %H:%M:%S')
+            handler.setFormatter(formatter)
             # Adds the filehandler to the Python logger module
             self.logger.addHandler(handler)
-        else:
-            # Console logging
-            logging.basicConfig(format='[%(asctime)s.%(msecs)03d] %(levelname)s:%(message)s', datefmt='%Y%m%d %H:%M:%S',
-                                level=level)
-            logging.info("Logger Module Loaded")
 
         # PKTDUMP mode dumps packet information
         logging.addLevelName(5, "PKTDUMP")

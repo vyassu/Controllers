@@ -37,7 +37,8 @@ class OverlayVisualizer(ControllerModule):
         # Increment the counter with every timer thread invocation
         self.interval_counter += 1
         if self.interval_counter % self.CMConfig["TopologyDataQueryInterval"] == 0:
-            self.registerCBT("BaseTopologyManager", "GET_VISUALIZER_DATA", {"interface_name": ""})
+            for interface_name in self.ipop_interface_details.keys():
+                self.registerCBT("BaseTopologyManager", "GET_VISUALIZER_DATA", {"interface_name": interface_name})
         if self.interval_counter % self.CMConfig["WebServiceDataPostInterval"] == 0:
             try:
                 # Iterate across the IPOP interface details table to send Node network details

@@ -89,7 +89,7 @@ LCAS = {
         "TransactionId": 100005,
         "ControlType": "TincanRequest",
         "Request": {
-          "Command": "CreateLinkListener",
+          "Command": "CreateTunnel",
           "InterfaceName": "ipop_tap0",
           "EncryptionEnabled": True,
           "PeerInfo": {
@@ -107,7 +107,7 @@ CONCT = {
         "TransactionId": 100006,
         "ControlType": "TincanRequest",
         "Request": {
-          "Command": "ConnectToPeer",
+          "Command": "ConnectTunnel",
           "InterfaceName": "ipop_tap0",
           "EncryptionEnabled": True,
           "PeerInfo": {
@@ -220,8 +220,32 @@ DELETE_FORWARDING_RULE = {
                 }
         }
 }
-
-
+LINK_STATS = {
+    "IPOP": {
+        "ProtocolVersion": 4,
+        "TransactionId" : 100202,
+        "Owner" : "ModuleName",
+        "ControlType": "TincanRequest",
+        "Request": {
+        "Command": "QueryLinkStats",
+        "InterfaceName": "ipop_tap0",
+        "MAC" : ""
+        }
+    }
+}
+QUERY_CAS = {
+    "IPOP": {
+        "ProtocolVersion": 4,
+        "TransactionId" : 100202,
+        "Owner" : "",
+        "ControlType": "TincanRequest",
+        "Request": {
+          "Command": "QueryCandidateAddressSet",
+          "InterfaceName": "ipop_tap0",
+          "MAC" : ""
+        }
+    }
+}
 def ip4_a2hex(ipstr):
     return "".join(hex(int(x, 10))[2:] for x in ipstr.split("."))
 
